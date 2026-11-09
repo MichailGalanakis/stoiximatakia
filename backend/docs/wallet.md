@@ -51,6 +51,35 @@ exactly one ledger. Lobby lists default to `currency=credits`, so the current
 frontend never shows a euro table; `GET /multiplayer/v1/tables?gameId=…&currency=EUR`
 lists euro tables, and create accepts `"currency": "EUR"`.
 
+## Player-vs-platform matches
+
+Migration 012 adds the financial engine for matches against the platform, where
+the company pays a fixed prize (seeded offer `stake-5-prize-8`: stake €5, prize €8).
+Game wiring (a bot opponent and its result) is not built yet: computer play is
+still disabled on the platform, so this is a server-side service with no player
+endpoint.
+
+- **Company reserve** (`house_reserve`) is company capital, funded only through
+  audited admin capital moves from `external:company` (`house_capital_movements`).
+  It is separate from player balances and from `house_revenue`.
+- **Start** (`WalletStore.startHouseMatch`, kind `house_stake`): in one transaction,
+  the player's stake and the rest of the prize (prize − stake) from the reserve are
+  locked in `house_match:<id>`. If the free reserve cannot cover it, the match is
+  refused (`house_reserve_insufficient`). Every accepted match is therefore fully
+  funded, however many players win at the same time. One active match per player.
+- **Settle** (`WalletStore.settleHouseMatch`, kind `house_settle`, exactly once):
+  `won`: the player receives the prize (€8). `lost`: the stake goes to `house_revenue`
+  and the locked €3 returns to the reserve. `void`: the stake returns to the player
+  and the €3 to the reserve. Only the server's authoritative game result may call it.
+- Offer prices are immutable once published (only `active` can change); a match
+  stores its own stake/prize snapshot.
+
+Admin: `POST /wallet/v1/admin/house/capital {operationId, direction: in|out,
+amountMinor, reviewer, note?}` (idempotent per `operationId`; `out` cannot exceed the
+free reserve) and `GET /wallet/v1/admin/house/matches?status=`. The summary reports
+`house.reserveMinor`, `house.exposureMinor` (locked for active matches) and
+`house.activeMatches`.
+
 ## Deposit flow
 
 1. `POST /wallet/v1/deposits {operationId, amountMinor}` creates a `pending` deposit
@@ -157,8 +186,8 @@ yet, so the wallet stays disabled on `dev.stoiximatakia.gr` until enabled on pur
 
 ## Next steps (specification order)
 
-1. The player-vs-platform model (fixed prize against the house, with a reserve that
-   covers simultaneous wins) and multi-table tournaments.
+1. Wire player-vs-platform matches to a server-side bot game (owner to choose games
+   and offers; computer play is currently disabled) and add multi-table tournaments.
 2. Refunds, disputes, corrections, reconciliation reports and an admin dashboard.
 3. Frontend: euro wallet screen and euro lobby (needs the owner's agreement first).
 4. A licensed provider adapter, after legal approval.
