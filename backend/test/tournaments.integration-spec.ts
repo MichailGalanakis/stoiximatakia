@@ -199,7 +199,6 @@ void describe('euro tournaments against PostgreSQL', () => {
     cancellationPolicy:
       'Full refund before the start or if the organiser cancels.',
     prizeShares: [6000, 3000, 1000],
-    changedBy: 'ops-1',
     ...extra,
   });
   async function create(extra: Record<string, unknown> = {}) {

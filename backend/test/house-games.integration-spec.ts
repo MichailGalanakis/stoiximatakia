@@ -155,7 +155,6 @@ void describe('player-vs-platform games against bots', () => {
       operationId: randomUUID(),
       direction: 'in',
       amountMinor: 100_000,
-      reviewer: 'test-setup',
     });
     assert.equal(reserve.statusCode, 200, reserve.body);
   });

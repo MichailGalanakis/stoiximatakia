@@ -167,7 +167,6 @@ void describe('player-vs-platform matches against PostgreSQL', () => {
       operationId: randomUUID(),
       direction,
       amountMinor,
-      reviewer: 'finance-1',
     });
     assert.equal(r.statusCode, 200, r.body);
     return r.json<{ reserveMinor: number }>().reserveMinor;
@@ -210,7 +209,6 @@ void describe('player-vs-platform matches against PostgreSQL', () => {
       operationId,
       direction: 'in',
       amountMinor: 600,
-      reviewer: 'finance-1',
       note: 'Initial reserve',
     };
     const first = await adminCall('POST', 'house/capital', input);
@@ -239,7 +237,7 @@ void describe('player-vs-platform matches against PostgreSQL', () => {
       [operationId],
     );
     assert.deepEqual(audit.rows, [
-      { reviewer: 'finance-1', note: 'Initial reserve' },
+      { reviewer: 'root', note: 'Initial reserve' },
     ]);
     const unauthorized = await app.inject({
       method: 'POST',

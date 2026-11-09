@@ -380,7 +380,6 @@ void describe('euro wallet against PostgreSQL', () => {
       'POST',
       `withdrawals/${w2.withdrawal.id}/reject`,
       {
-        reviewer: 'finance-1',
         note: 'Identity documents missing',
       },
     );
@@ -395,9 +394,7 @@ void describe('euro wallet against PostgreSQL', () => {
     const approved = await adminCall(
       'POST',
       `withdrawals/${w3.withdrawal.id}/approve`,
-      {
-        reviewer: 'finance-1',
-      },
+      {},
     );
     assert.equal(approved.statusCode, 200, approved.body);
     assert.equal(
@@ -407,9 +404,7 @@ void describe('euro wallet against PostgreSQL', () => {
     const reApprove = await adminCall(
       'POST',
       `withdrawals/${w3.withdrawal.id}/approve`,
-      {
-        reviewer: 'finance-1',
-      },
+      {},
     );
     assert.equal(reApprove.statusCode, 409);
     const payout = {
@@ -467,9 +462,7 @@ void describe('euro wallet against PostgreSQL', () => {
   void it('returns funds when the provider reports a failed payout', async () => {
     const p = await funded(4000);
     const w = (await withdraw(p, 4000)).json<{ withdrawal: { id: string } }>();
-    await adminCall('POST', `withdrawals/${w.withdrawal.id}/approve`, {
-      reviewer: 'finance-2',
-    });
+    await adminCall('POST', `withdrawals/${w.withdrawal.id}/approve`, {});
     const mismatch = await webhook({
       id: 'evt_' + randomUUID(),
       type: 'payout.succeeded',
