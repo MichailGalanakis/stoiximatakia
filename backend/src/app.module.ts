@@ -8,10 +8,17 @@ import {
 import { RegistrationModule } from './registration/registration.module';
 import { HouseModule } from './house/house.module';
 import { PlatformModule } from './tables/platform.module';
+import { TournamentModule } from './tournaments/tournament.module';
 import { WalletModule } from './wallet/wallet.module';
 
 @Module({
-  imports: [RegistrationModule, PlatformModule, WalletModule, HouseModule],
+  imports: [
+    RegistrationModule,
+    PlatformModule,
+    WalletModule,
+    HouseModule,
+    TournamentModule,
+  ],
   controllers: [HealthController],
   providers: [
     {

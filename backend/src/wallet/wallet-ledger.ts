@@ -13,7 +13,11 @@ export type LedgerKind =
   | 'capital_in'
   | 'capital_out'
   | 'house_stake'
-  | 'house_settle';
+  | 'house_settle'
+  | 'tournament_entry'
+  | 'tournament_refund'
+  | 'tournament_start'
+  | 'tournament_payout';
 
 export interface Entry {
   account: string;

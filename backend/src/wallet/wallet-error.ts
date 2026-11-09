@@ -19,7 +19,16 @@ export type WalletCode =
   | 'house_reserve_insufficient'
   | 'house_match_active'
   | 'house_match_not_found'
-  | 'house_match_settled';
+  | 'house_match_settled'
+  | 'invalid_tournament'
+  | 'tournament_not_found'
+  | 'tournament_unavailable'
+  | 'tournament_full'
+  | 'tournament_locked'
+  | 'tournament_underfilled'
+  | 'already_registered'
+  | 'not_registered'
+  | 'invalid_ranking';
 
 export class WalletError extends HttpException {
   constructor(
