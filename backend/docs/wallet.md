@@ -55,9 +55,8 @@ lists euro tables, and create accepts `"currency": "EUR"`.
 
 Migration 012 adds the financial engine for matches against the platform, where
 the company pays a fixed prize (seeded offer `stake-5-prize-8`: stake €5, prize €8).
-Game wiring (a bot opponent and its result) is not built yet: computer play is
-still disabled on the platform, so this is a server-side service with no player
-endpoint.
+Migration 013 and `src/house` add the games themselves (owner decision,
+9 November 2026: all seven games, current offer only, no frontend yet).
 
 - **Company reserve** (`house_reserve`) is company capital, funded only through
   audited admin capital moves from `external:company` (`house_capital_movements`).
@@ -79,6 +78,51 @@ amountMinor, reviewer, note?}` (idempotent per `operationId`; `out` cannot excee
 free reserve) and `GET /wallet/v1/admin/house/matches?status=`. The summary reports
 `house.reserveMinor`, `house.exposureMinor` (locked for active matches) and
 `house.activeMatches`.
+
+### Games against bots
+
+The player takes seat 0; every other seat is a server bot (`bot-1`…). In Tichu and
+Biriba the player's partner (seat 2) is also a bot, and a team win pays the player.
+Each command runs the existing game runtime with no rule changes:
+
+1. The player's move is applied by the engine, then the bots move until the game
+   waits for the player again or ends. Bots choose from their own seat's
+   observation (never hidden cards), using the engines' `random` strategy with a
+   stored random state, and every bot move goes through the same engine validation.
+   Bots never press "next deal"; the player controls round transitions.
+2. Engines that prepare moves outside database transactions (strict chess) are
+   supported: the whole sequence is prepared first, then committed in one
+   transaction only if the game revision is unchanged (`stale_game_revision`
+   otherwise).
+3. On the engine's result the match settles in the same transaction: player
+   (or team) wins → `won`, otherwise `lost`; a chess draw → `void`. Forfeit is a loss.
+
+Funding (`startHouseMatch`) and game creation commit together. Every move is stored
+in `house_game_events`; a deferred check keeps `house_games.revision` equal to the
+history. Commands are idempotent per `operationId`.
+
+Player API (session cookie; writes need the app `Origin` and `X-SkillBetting-Client`):
+
+| Method | Path                            | Purpose                                                                        |
+| ------ | ------------------------------- | ------------------------------------------------------------------------------ |
+| GET    | `/house/v1/offers`              | active offers (stake/prize)                                                    |
+| POST   | `/house/v1/matches`             | `{operationId, gameId, offerId, formatId?}` start (Tichu defaults to `single`) |
+| GET    | `/house/v1/matches/:id`         | match, seats and the player's observation                                      |
+| POST   | `/house/v1/matches/:id/actions` | `{operationId, expectedRevision, action}`                                      |
+| POST   | `/house/v1/matches/:id/forfeit` | `{operationId}`                                                                |
+
+Tests play complete matches against bots in all six card games, and a chess opening
+through the detached path. Long random chess games drive the strict engine's
+legality proofs into very slow positions (minutes per move in testing); production
+chess prepares moves in workers, but response times for long chess games against
+bots should be measured before launch.
+
+**Bot strength is a financial risk.** The owner deferred bot strength for
+multiplayer, but here the company pays when the bot loses. The engines' bots pick
+random legal moves, so a skilled player will usually beat them, and a fixed
+€5 → €8 offer then loses money on average. Measure the win rate in the sandbox and
+use stronger bots, or offers whose prize matches the real win rate, before any real
+money is played.
 
 ## Deposit flow
 
@@ -186,8 +230,8 @@ yet, so the wallet stays disabled on `dev.stoiximatakia.gr` until enabled on pur
 
 ## Next steps (specification order)
 
-1. Wire player-vs-platform matches to a server-side bot game (owner to choose games
-   and offers; computer play is currently disabled) and add multi-table tournaments.
+1. Stronger bots or win-rate-based offers for games against the platform, more
+   offers, and multi-table tournaments.
 2. Refunds, disputes, corrections, reconciliation reports and an admin dashboard.
 3. Frontend: euro wallet screen and euro lobby (needs the owner's agreement first).
 4. A licensed provider adapter, after legal approval.
