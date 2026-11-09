@@ -9,7 +9,11 @@ export type LedgerKind =
   | 'stake_reserve'
   | 'stake_release'
   | 'stake_commit'
-  | 'settle';
+  | 'settle'
+  | 'capital_in'
+  | 'capital_out'
+  | 'house_stake'
+  | 'house_settle';
 
 export interface Entry {
   account: string;

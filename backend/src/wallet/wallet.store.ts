@@ -12,6 +12,13 @@ import {
   type PaymentProvider,
   type ProviderEvent,
 } from './payment-provider';
+import {
+  HOUSE_MATCH_COLUMNS,
+  houseMatchView,
+  settleHouseMatch,
+  startHouseMatch,
+  type HouseOutcome,
+} from './house-matches';
 import { WalletError } from './wallet-error';
 import { externalAccount, postWallet, userAccount } from './wallet-ledger';
 import {
@@ -633,9 +640,14 @@ export class WalletStore implements OnModuleDestroy {
       const ledger = await c.query<{ sum: number; count: number }>(
         'SELECT coalesce(sum(amount_minor),0)::float8 AS sum,count(DISTINCT transaction_id)::int AS count FROM ledger_entries',
       );
-      const open = await c.query<{ deposits: number; withdrawals: number }>(
+      const open = await c.query<{
+        deposits: number;
+        withdrawals: number;
+        houseMatches: number;
+      }>(
         `SELECT (SELECT count(*)::int FROM deposits WHERE status='pending') AS deposits,
-                (SELECT count(*)::int FROM withdrawal_requests WHERE status IN ('requested','processing')) AS withdrawals`,
+                (SELECT count(*)::int FROM withdrawal_requests WHERE status IN ('requested','processing')) AS withdrawals,
+                (SELECT count(*)::int FROM house_matches WHERE status='active') AS "houseMatches"`,
       );
       return {
         currency: 'EUR',
@@ -644,6 +656,12 @@ export class WalletStore implements OnModuleDestroy {
         pendingWithdrawalMinor: total('withdrawal_pending'),
         prizePoolMinor: total('prize_pool'),
         houseRevenueMinor: total('house_revenue'),
+        house: {
+          // Free reserve can back new matches; exposure is locked for active ones.
+          reserveMinor: total('house_reserve'),
+          exposureMinor: total('house_match'),
+          activeMatches: open.rows[0]!.houseMatches,
+        },
         providers: accounts.rows
           .filter((a) => a.kind === 'external')
           .map((a) => ({
@@ -655,8 +673,108 @@ export class WalletStore implements OnModuleDestroy {
           transactions: ledger.rows[0]!.count,
           balanced: ledger.rows[0]!.sum === 0,
         },
-        open: open.rows[0]!,
+        open: {
+          deposits: open.rows[0]!.deposits,
+          withdrawals: open.rows[0]!.withdrawals,
+        },
       };
     });
+  }
+
+  /** Moves company capital into or out of the reserve; never touches player funds. */
+  moveCapital(input: {
+    operationId: string;
+    direction: 'in' | 'out';
+    amountMinor: number;
+    reviewer: string;
+    note?: string | undefined;
+  }) {
+    return this.transaction(async (c) => {
+      const previous = await c.query<{
+        direction: string;
+        amount: number;
+      }>(
+        'SELECT direction,amount_minor::float8 AS amount FROM house_capital_movements WHERE id=$1',
+        [input.operationId],
+      );
+      if (previous.rows[0]) {
+        if (
+          previous.rows[0].direction !== input.direction ||
+          previous.rows[0].amount !== input.amountMinor
+        )
+          throw new WalletError('operation_conflict', 409);
+        return { reserveMinor: await this.reserveOf(c) };
+      }
+      if (input.direction === 'out') {
+        const reserve = await c.query<{ amount: number }>(
+          "SELECT balance_minor::float8 AS amount FROM wallet_accounts WHERE key='house_reserve' FOR UPDATE",
+        );
+        if (reserve.rows[0]!.amount < input.amountMinor)
+          throw new WalletError('house_reserve_insufficient', 409);
+      }
+      const sign = input.direction === 'in' ? 1 : -1;
+      const tx = await postWallet(c, {
+        operationKey: `capital:${input.operationId}`,
+        kind: input.direction === 'in' ? 'capital_in' : 'capital_out',
+        referenceId: input.operationId,
+        entries: [
+          { account: 'external:company', amount: -sign * input.amountMinor },
+          { account: 'house_reserve', amount: sign * input.amountMinor },
+        ],
+      });
+      await c.query(
+        'INSERT INTO house_capital_movements(id,direction,amount_minor,reviewer,note,transaction_id) VALUES($1,$2,$3,$4,$5,$6)',
+        [
+          input.operationId,
+          input.direction,
+          input.amountMinor,
+          input.reviewer,
+          input.note ?? null,
+          tx,
+        ],
+      );
+      return { reserveMinor: await this.reserveOf(c) };
+    });
+  }
+  private async reserveOf(c: PoolClient) {
+    const { rows } = await c.query<{ amount: number }>(
+      "SELECT balance_minor::float8 AS amount FROM wallet_accounts WHERE key='house_reserve'",
+    );
+    return rows[0]!.amount;
+  }
+
+  adminHouseMatches(status: string | undefined) {
+    return this.transaction(async (c) => {
+      const { rows } = await c.query<Parameters<typeof houseMatchView>[0]>(
+        `SELECT ${HOUSE_MATCH_COLUMNS} FROM house_matches
+         WHERE $1::text IS NULL OR status=$1 ORDER BY created_at DESC,id LIMIT 200`,
+        [status ?? null],
+      );
+      return { matches: rows.map(houseMatchView) };
+    });
+  }
+
+  /** Server-side entry point for a player-vs-platform game; not exposed over HTTP. */
+  startHouseMatch(input: {
+    matchId: string;
+    userId: string;
+    offerId: string;
+    gameId: string;
+  }) {
+    return this.transaction(async (c) => {
+      // Same account row lock as session commands, so stakes and withdrawals serialize.
+      const { rows } = await c.query<Actor>(
+        'SELECT id,account_kind,email_verified,phone_verified FROM users WHERE id=$1 FOR NO KEY UPDATE',
+        [input.userId],
+      );
+      if (!rows[0]) throw new WalletError('account_not_eligible', 403);
+      this.requireEligible(rows[0]);
+      return startHouseMatch(c, input);
+    });
+  }
+
+  /** Called only with the server's authoritative game result. */
+  settleHouseMatch(matchId: string, outcome: HouseOutcome) {
+    return this.transaction((c) => settleHouseMatch(c, matchId, outcome));
   }
 }

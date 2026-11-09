@@ -20,6 +20,8 @@ import {
 import { tokenDigest } from '../registration/registration.service';
 import {
   AmountOperationDto,
+  CapitalDto,
+  HouseMatchFilterDto,
   ProviderDto,
   ReviewDto,
   WalletOperationDto,
@@ -151,6 +153,25 @@ export class WalletAdminController {
   ) {
     this.admin(req, reply);
     return this.store.summary();
+  }
+  @Post('house/capital')
+  @HttpCode(200)
+  capital(
+    @Body() input: CapitalDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    this.admin(req, reply);
+    return this.store.moveCapital(input);
+  }
+  @Get('house/matches')
+  houseMatches(
+    @Query() query: HouseMatchFilterDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    this.admin(req, reply);
+    return this.store.adminHouseMatches(query.status);
   }
   @Get('withdrawals')
   withdrawals(

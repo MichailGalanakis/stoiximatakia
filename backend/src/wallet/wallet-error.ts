@@ -14,7 +14,12 @@ export type WalletCode =
   | 'withdrawal_state_conflict'
   | 'provider_not_found'
   | 'invalid_signature'
-  | 'admin_unauthorized';
+  | 'admin_unauthorized'
+  | 'house_offer_unavailable'
+  | 'house_reserve_insufficient'
+  | 'house_match_active'
+  | 'house_match_not_found'
+  | 'house_match_settled';
 
 export class WalletError extends HttpException {
   constructor(
