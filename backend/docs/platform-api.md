@@ -103,6 +103,12 @@ Create fields:
 }
 ```
 
+Optional `"currency": "EUR"` creates a euro table funded from the euro wallet
+(default `"credits"`). Snapshots and tickets carry `currency`; command balances are
+in the table's currency. `GET /tables` lists one currency, `credits` unless
+`&currency=EUR` is given. Euro seats need a verified registered account
+(`account_not_eligible`) and euros (`insufficient_funds`). See [wallet](wallet.md).
+
 Open discovery follows the owner's 2 November decision: public `waiting`/`playing` tables only, including full tables. HTTP list reads and native live lobby snapshots use the same filter; projected status is rechecked if a match finishes after ID selection. `completed`/`cancelled` tables stop appearing or contributing to the open count. `GET /tickets` still returns the owner's complete ticket history, and authorized `GET /tables/:id` plus a targeted live snapshot still expose terminal details. An individually cancelled ticket does not hide a table that remains `waiting`. No deletion, financial mutation, timer or access-policy change accompanies list filtering.
 
 Private creation uses `visibility:"private"` and `accessCode` with 6–32 ASCII alphanumeric characters. Codes are case sensitive, keyed-digest stored and unique among waiting/playing private tables. `TABLE_CODE_SECRET` is a stable server-only key of at least 32 bytes. An absent/blank key leaves public operations available and rejects private operations with `platform_unavailable`. Never send hashes or raw codes back in snapshots. Private entry is limited to 20 attempts per minute per account and connection-IP key; failed guesses remain counted. Invalid sessions create no attempt counters.

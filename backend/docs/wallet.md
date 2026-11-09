@@ -26,8 +26,30 @@ demo only.
 
 Accounts: `available:<user>`, `reserved:<user>` (stakes), `withdrawal_pending:<user>`,
 `external:<provider>` (money held at a PSP; negative while it holds player funds),
-`house_revenue` and `prize_pool:<id>`. The stake/settle kinds exist and are tested at
-ledger level; wiring euro tables into the game platform is a later step.
+`house_revenue` and `prize_pool:<table>`.
+
+## Euro tables
+
+Migration 011 adds `game_tables.currency` (`credits` default, or `EUR`), frozen at
+creation. Euro tables run the existing table lifecycle unchanged, but every money
+movement goes to this ledger instead of the credit ledger (`src/tables/table-ledger.ts`):
+
+| Step                       | Credit table | Euro table (`ledger_transactions.kind`)                                 |
+| -------------------------- | ------------ | ----------------------------------------------------------------------- |
+| Seat claimed               | `reserve`    | `stake_reserve`: available → reserved (fee + contribution)              |
+| Seat released before start | `release`    | `stake_release`: reserved → available                                   |
+| Match starts               | `start`      | `stake_commit`: reserved → `prize_pool:<table>` + `house_revenue` (fee) |
+| Result                     | `settle`     | `settle`: prize pool → winners (or contributions back on a draw)        |
+| Cancel/void before play    | `settle`     | `settle`: prize pool and fees back to every player                      |
+
+Prices are the same numbers as credit tables (fee €0.90, contribution
+€1/€5/€15/€30). Joining a euro table needs a registered account with a verified
+contact and enough euros; credits can never pay for a euro seat, nor euros for a
+credit seat. The database settlement check (`match_reconciled`) now verifies euro
+settlements against `ledger_entries`, and each `match_settlements` row points to
+exactly one ledger. Lobby lists default to `currency=credits`, so the current
+frontend never shows a euro table; `GET /multiplayer/v1/tables?gameId=…&currency=EUR`
+lists euro tables, and create accepts `"currency": "EUR"`.
 
 ## Deposit flow
 
@@ -135,7 +157,8 @@ yet, so the wallet stays disabled on `dev.stoiximatakia.gr` until enabled on pur
 
 ## Next steps (specification order)
 
-1. Euro stakes on tables/tournaments (prize pool accounts, settlement into
-   `house_revenue`), and the player-vs-platform reserve model.
+1. The player-vs-platform model (fixed prize against the house, with a reserve that
+   covers simultaneous wins) and multi-table tournaments.
 2. Refunds, disputes, corrections, reconciliation reports and an admin dashboard.
-3. A licensed provider adapter, after legal approval.
+3. Frontend: euro wallet screen and euro lobby (needs the owner's agreement first).
+4. A licensed provider adapter, after legal approval.
