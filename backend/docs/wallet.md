@@ -74,7 +74,7 @@ Migration 013 and `src/house` add the games themselves (owner decision,
   stores its own stake/prize snapshot.
 
 Admin: `POST /wallet/v1/admin/house/capital {operationId, direction: in|out,
-amountMinor, reviewer, note?}` (idempotent per `operationId`; `out` cannot exceed the
+amountMinor, note?}` (finance role; idempotent per `operationId`; `out` cannot exceed the
 free reserve) and `GET /wallet/v1/admin/house/matches?status=`. The summary reports
 `house.reserveMinor`, `house.exposureMinor` (locked for active matches) and
 `house.activeMatches`.
@@ -153,10 +153,11 @@ ranking from a server-side call only; no HTTP endpoint accepts results.
 Player API (`/tournaments/v1`): `GET tournaments`, `GET tournaments/:id`,
 `GET tickets`, `POST tournaments/:id/tickets {operationId}`,
 `POST tournaments/:id/tickets/cancel {operationId}`.
-Admin API (`/tournaments/v1/admin`, same Bearer token): `GET tournaments`
-(dashboard: tickets by state, fees, pool, payouts, refunds, reconciliation flag),
-`POST tournaments {id, …config, changedBy}`, `PUT tournaments/:id`,
-`POST tournaments/:id/start`, `POST tournaments/:id/cancel`.
+Admin API (`/tournaments/v1/admin`, admin tokens below): `GET tournaments`
+(viewer; dashboard: tickets by state, fees, pool, payouts, refunds, reconciliation
+flag), and with the finance role `POST tournaments {id, …config}`,
+`PUT tournaments/:id`, `POST tournaments/:id/start`, `POST tournaments/:id/cancel`.
+The authenticated admin is recorded as the author of each change.
 
 ## Deposit flow
 
@@ -219,12 +220,54 @@ Writes are idempotent per `operationId`; replaying with different content is `40
 
 Provider: `POST /wallet/v1/providers/:provider/webhook` (signature only, no session).
 
-Admin (`Authorization: Bearer $WALLET_ADMIN_TOKEN`; disabled when unset):
+Admin (`Authorization: Bearer <token>`): see [Finance controls](#finance-controls).
 `GET /wallet/v1/admin/summary` (liabilities, house revenue, provider positions,
-ledger balance check), `GET /wallet/v1/admin/withdrawals?status=`,
-`POST /wallet/v1/admin/withdrawals/:id/approve|reject {reviewer, note?}`.
-A single shared token is a sandbox measure; role-based access is required before
-real money.
+open disputes, chargeback shortfall, ledger balance check),
+`GET /wallet/v1/admin/withdrawals?status=`,
+`POST /wallet/v1/admin/withdrawals/:id/approve|reject {note?}`.
+
+## Finance controls
+
+Migration 015 adds the specification's step 3 controls.
+
+**Admins and roles.** Each admin has a named account and a personal token (shown
+once; only a hash is stored). Roles: `viewer` reads everything; `finance` also
+approves withdrawals, moves capital, runs tournaments, requests/decides corrections,
+handles disputes and runs reconciliations; `admin` also creates and deactivates
+admin accounts. Accounts can only be deactivated, never edited or reactivated.
+`WALLET_ADMIN_TOKEN` remains a break-glass `root` admin; keep it offline once named
+admins exist. Endpoints: `GET|POST /wallet/v1/admin/admins {name, role}`,
+`POST /wallet/v1/admin/admins/:name/deactivate`.
+
+**Audit log.** Every admin action (withdrawal decisions, capital moves, tournament
+changes, corrections, disputes, reconciliations, admin management) writes an
+`admin_audit_log` row inside the same transaction, with the actor's name and role,
+so nothing commits unaudited. Append-only. `GET /wallet/v1/admin/audit?limit=`.
+
+**Corrections (four-eyes).** The only way to change a balance by hand.
+`POST /wallet/v1/admin/corrections {id, userId, amountMinor (±), reason}` creates a
+pending request; `POST corrections/:id/decision {decision: approve|reject}` must be
+made by a different admin (`same_reviewer` otherwise, also enforced in the
+database). An approved correction is a ledger transaction against company funds
+(`external:company`); a debit needs the player's available balance.
+
+**Disputes (chargebacks).** Opened by the provider (`deposit.disputed`) or by
+finance (`POST disputes {depositId, reason}`), one per deposit. While a player has an
+open dispute, withdrawals cannot be requested or approved (`account_restricted`).
+Resolution by the provider (`dispute.won` / `dispute.lost`) or finance
+(`POST disputes/:id/resolve {outcome, note?}`). Lost: the provider has returned the
+money to the cardholder, so the deposit amount comes back out of the player's
+available balance; what the player no longer holds is absorbed by the company and
+recorded as `shortfallMinor` (summary: `chargebackShortfallMinor`) for collection.
+
+**Reconciliation.** `POST /wallet/v1/admin/reconciliations {provider, periodEnd,
+reportedHeldMinor}` compares the provider's statement with the ledger and re-derives
+the provider position from deposits − paid withdrawals − lost chargebacks. It also
+checks the ledger balances, every balance matches its history, finished tables and
+tournaments have empty pools, and settled house matches are empty. Each run is
+stored (`ok` or `mismatch` with the difference); `GET reconciliations` lists them.
+Daily scheduling and fetching the statement from a real provider come with the
+provider integration.
 
 ## Sandbox provider
 
@@ -264,9 +307,10 @@ yet, so the wallet stays disabled on `dev.stoiximatakia.gr` until enabled on pur
 
 ## Next steps (specification order)
 
-1. Refunds, disputes and authorised corrections; daily reconciliation reports;
-   audit logs and role-based admin access (specification step 3).
+1. A licensed provider adapter (specification step 4), after legal approval:
+   hosted payments, payouts, provider refunds, statement fetch for daily
+   reconciliation, and KYC/age checks at `requireEligible`.
 2. Tournament play format (owner to decide) feeding the server-side ranking;
    stronger bots or win-rate-based offers for games against the platform.
-3. Frontend: euro wallet screen and euro lobby (needs the owner's agreement first).
-4. A licensed provider adapter, after legal approval.
+3. Frontend: euro wallet, euro lobby and an admin finance dashboard (needs the
+   owner's agreement first).
