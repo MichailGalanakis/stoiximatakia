@@ -2,7 +2,13 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { IncomingHttpHeaders } from 'node:http';
 
 export type ProviderEventType =
-  'deposit.succeeded' | 'deposit.failed' | 'payout.succeeded' | 'payout.failed';
+  | 'deposit.succeeded'
+  | 'deposit.failed'
+  | 'deposit.disputed'
+  | 'dispute.won'
+  | 'dispute.lost'
+  | 'payout.succeeded'
+  | 'payout.failed';
 
 /** A verified provider notification, keyed by our own deposit/withdrawal ID. */
 export interface ProviderEvent {
@@ -40,6 +46,9 @@ const TOLERANCE_SECONDS = 300;
 const EVENT_TYPES = new Set<string>([
   'deposit.succeeded',
   'deposit.failed',
+  'deposit.disputed',
+  'dispute.won',
+  'dispute.lost',
   'payout.succeeded',
   'payout.failed',
 ]);

@@ -17,7 +17,9 @@ export type LedgerKind =
   | 'tournament_entry'
   | 'tournament_refund'
   | 'tournament_start'
-  | 'tournament_payout';
+  | 'tournament_payout'
+  | 'correction'
+  | 'chargeback';
 
 export interface Entry {
   account: string;
