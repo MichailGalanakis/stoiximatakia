@@ -403,6 +403,7 @@ void describe('shared lifecycle and initial settlement against isolated PostgreS
           state: ticketState,
           feeMinor: 90,
           contributionMinor: 500,
+          currency: 'credits',
         });
         const direct = await get(p, `tables/${terminal.tableId}`);
         assert.equal(direct.statusCode, 200, direct.body);
