@@ -124,6 +124,40 @@ random legal moves, so a skilled player will usually beat them, and a fixed
 use stronger bots, or offers whose prize matches the real win rate, before any real
 money is played.
 
+## Tournaments
+
+Migration 014 and `src/tournaments` implement the specification's "Tournament
+Ticketing & Prize Pool Engine" (financial side). How a tournament is played and
+ranked (knock-out, rounds, tables) is not specified yet, so payout takes the final
+ranking from a server-side call only; no HTTP endpoint accepts results.
+
+- **Configuration** (admin): game, name, organisation fee, prize contribution,
+  min/max players, start time, cancellation policy and prize shares per place
+  (basis points summing to 100%, no more paid places than the minimum field).
+  Every version is kept in `tournament_changes`. Prices and prizes can change only
+  while no ticket has been sold; after the start the database freezes them.
+- **Ticket purchase** (player): one transaction checks eligibility (verified
+  registered account), status/time, free seats, one ticket per player and balance,
+  then posts `tournament_entry`: the contribution to `tournament_pool:<id>` (a
+  liability to players, not revenue) and the fee to `tournament_fees:<id>` (held).
+  Idempotent per `operationId`; concurrent buyers cannot exceed `maxPlayers`.
+- **Cancellation**: a player may cancel before the start (full refund). Organiser
+  cancellation refunds every ticket in full, before or after the start.
+- **Start** (admin): only with at least `minPlayers`; held fees move to
+  `house_revenue` (`tournament_start`).
+- **Payout** (`TournamentStore.complete(id, ranking)`): the ranking must list every
+  entrant exactly once. Each place gets `floor(pool × share)`, the rounding remainder
+  goes to first place, so payouts always equal the pool; a deferred database check
+  verifies it and that the pool account ends at zero. Runs exactly once.
+
+Player API (`/tournaments/v1`): `GET tournaments`, `GET tournaments/:id`,
+`GET tickets`, `POST tournaments/:id/tickets {operationId}`,
+`POST tournaments/:id/tickets/cancel {operationId}`.
+Admin API (`/tournaments/v1/admin`, same Bearer token): `GET tournaments`
+(dashboard: tickets by state, fees, pool, payouts, refunds, reconciliation flag),
+`POST tournaments {id, …config, changedBy}`, `PUT tournaments/:id`,
+`POST tournaments/:id/start`, `POST tournaments/:id/cancel`.
+
 ## Deposit flow
 
 1. `POST /wallet/v1/deposits {operationId, amountMinor}` creates a `pending` deposit
@@ -230,8 +264,9 @@ yet, so the wallet stays disabled on `dev.stoiximatakia.gr` until enabled on pur
 
 ## Next steps (specification order)
 
-1. Stronger bots or win-rate-based offers for games against the platform, more
-   offers, and multi-table tournaments.
-2. Refunds, disputes, corrections, reconciliation reports and an admin dashboard.
+1. Refunds, disputes and authorised corrections; daily reconciliation reports;
+   audit logs and role-based admin access (specification step 3).
+2. Tournament play format (owner to decide) feeding the server-side ranking;
+   stronger bots or win-rate-based offers for games against the platform.
 3. Frontend: euro wallet screen and euro lobby (needs the owner's agreement first).
 4. A licensed provider adapter, after legal approval.
