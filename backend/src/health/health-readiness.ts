@@ -6,7 +6,7 @@ import { Pool } from 'pg';
 import type { RegistrationSettings } from '../registration/registration-settings';
 
 /** Advance with a new migration; never rewrite an applied migration. */
-export const REQUIRED_SCHEMA_MIGRATION = '012_house_reserve.sql';
+export const REQUIRED_SCHEMA_MIGRATION = '013_house_games.sql';
 
 interface ReadinessConnection {
   query(sql: string, values: string[]): Promise<{ rows: { ready: boolean }[] }>;
