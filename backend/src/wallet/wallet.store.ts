@@ -14,7 +14,11 @@ import {
 } from './payment-provider';
 import { WalletError } from './wallet-error';
 import { externalAccount, postWallet, userAccount } from './wallet-ledger';
-import { WALLET_SETTINGS, type WalletSettings } from './wallet-settings';
+import {
+  WALLET_SETTINGS,
+  maxWithdrawableMinor,
+  type WalletSettings,
+} from './wallet-settings';
 
 const SESSION_PATTERN = /^[a-f0-9]{64}$/;
 const fingerprintOf = (value: unknown) =>
@@ -201,6 +205,7 @@ export class WalletStore implements OnModuleDestroy {
       reservedMinor,
       pendingWithdrawalMinor,
       totalMinor: availableMinor + reservedMinor + pendingWithdrawalMinor,
+      withdrawableMinor: maxWithdrawableMinor(availableMinor, this.settings),
     };
   }
 
@@ -334,8 +339,11 @@ export class WalletStore implements OnModuleDestroy {
             'SELECT balance_minor::float8 AS amount FROM wallet_accounts WHERE key=$1 FOR UPDATE',
             [userAccount('available', actor.id)],
           );
-          if ((available.rows[0]?.amount ?? 0) < amountMinor)
+          const availableMinor = available.rows[0]?.amount ?? 0;
+          if (availableMinor < amountMinor)
             throw new WalletError('insufficient_funds', 409);
+          if (amountMinor > maxWithdrawableMinor(availableMinor, this.settings))
+            throw new WalletError('withdrawal_share_exceeded', 409);
           const id = randomUUID();
           const hold = await postWallet(c, {
             operationKey: `withdrawal_hold:${id}`,

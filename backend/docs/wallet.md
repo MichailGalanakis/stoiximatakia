@@ -46,14 +46,24 @@ ledger level; wiring euro tables into the game platform is a later step.
 
 1. `POST /wallet/v1/withdrawals {operationId, amountMinor}` checks eligibility,
    the minimum (default €10), the 24-hour request limit (cancelled requests don't
-   count) and the available balance, then moves the amount to `withdrawal_pending`.
+   count), the available balance and the withdrawal share (below), then moves the
+   amount to `withdrawal_pending`.
    The payout goes to the provider of the player's most recent successful deposit.
 2. The player may cancel while `requested`.
 3. Finance approves (`processing`, payout order sent) or rejects (funds returned).
 4. The provider's `payout.succeeded` event pays out; `payout.failed` returns funds.
 
-Not yet implemented: the withdrawal fee scale mentioned in the specification
-("στα 200 ευρώ δεσμεύονται τα 49 με κλίμακα") is awaiting the owner's definition.
+### Withdrawal share (owner rule, 9 November 2026)
+
+A single request may take at most `min(available, max(€100, 80% × available))`,
+rounded down to the cent. Up to €100 the whole balance can be withdrawn; from
+€100 to €125 the cap stays at €100; above €125 it is 80% (€150 → €120,
+€200 → €160). It is computed on the available balance at request time; the rest
+stays in the wallet and can be requested later, within the daily request limit.
+Nothing is charged: the retained amount remains the player's. `GET /balance`
+returns the current cap as `withdrawableMinor`; a larger request fails with
+`withdrawal_share_exceeded`. Floor and share are configurable. Have this rule
+reviewed legally: some regimes require players to withdraw their own balance freely.
 
 ## Eligibility
 
@@ -67,14 +77,15 @@ Player (session cookie; writes need the app `Origin` and `X-SkillBetting-Client:
 
 | Method   | Path                                | Purpose                                            |
 | -------- | ----------------------------------- | -------------------------------------------------- |
-| GET      | `/wallet/v1/balance`                | available, reserved, pending withdrawal, total     |
+| GET      | `/wallet/v1/balance`                | balances, total and current `withdrawableMinor`    |
 | GET      | `/wallet/v1/transactions`           | latest 100 ledger entries on the player's accounts |
 | GET/POST | `/wallet/v1/deposits`               | list / start a deposit                             |
 | GET/POST | `/wallet/v1/withdrawals`            | list / request a withdrawal                        |
 | POST     | `/wallet/v1/withdrawals/:id/cancel` | cancel a `requested` withdrawal                    |
 
 Errors carry a `code`: `account_not_eligible`, `invalid_amount`, `insufficient_funds`,
-`withdrawal_limit_reached`, `withdrawal_state_conflict`, `operation_conflict`, etc.
+`withdrawal_limit_reached`, `withdrawal_share_exceeded`, `withdrawal_state_conflict`,
+`operation_conflict`, etc.
 Writes are idempotent per `operationId`; replaying with different content is `409`.
 
 Provider: `POST /wallet/v1/providers/:provider/webhook` (signature only, no session).
@@ -118,7 +129,8 @@ adapter should move the provider call outside it before going live.
 
 `WALLET_SANDBOX_SECRET`, `WALLET_ADMIN_TOKEN`, `WALLET_MIN_DEPOSIT_MINOR` (500),
 `WALLET_MAX_DEPOSIT_MINOR` (100000), `WALLET_MIN_WITHDRAWAL_MINOR` (1000),
-`WALLET_WITHDRAWALS_PER_DAY` (3). The deployment compose file does not pass these
+`WALLET_WITHDRAWALS_PER_DAY` (3), `WALLET_WITHDRAWAL_FLOOR_MINOR` (10000),
+`WALLET_WITHDRAWAL_SHARE_BPS` (8000 = 80%). The deployment compose file does not pass these
 yet, so the wallet stays disabled on `dev.stoiximatakia.gr` until enabled on purpose.
 
 ## Next steps (specification order)

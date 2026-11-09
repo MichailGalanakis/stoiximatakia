@@ -9,6 +9,24 @@ export interface WalletSettings {
   maxDepositMinor: number;
   minWithdrawalMinor: number;
   withdrawalsPerDay: number;
+  /** A request may always take up to this amount (capped by the balance). */
+  withdrawalFloorMinor: number;
+  /** Above the floor, a request may take this share of the available balance. */
+  withdrawalShareBps: number;
+}
+
+/** Owner rule: up to €100 in full, otherwise 80% of the available balance. */
+export function maxWithdrawableMinor(
+  availableMinor: number,
+  settings: Pick<WalletSettings, 'withdrawalFloorMinor' | 'withdrawalShareBps'>,
+): number {
+  const share = Math.floor(
+    (availableMinor * settings.withdrawalShareBps) / 10_000,
+  );
+  return Math.min(
+    availableMinor,
+    Math.max(settings.withdrawalFloorMinor, share),
+  );
 }
 
 function amount(
@@ -41,6 +59,13 @@ export function walletSettings(
     maxDepositMinor: amount(env, 'WALLET_MAX_DEPOSIT_MINOR', 100_000),
     minWithdrawalMinor: amount(env, 'WALLET_MIN_WITHDRAWAL_MINOR', 1000),
     withdrawalsPerDay: amount(env, 'WALLET_WITHDRAWALS_PER_DAY', 3, 100),
+    withdrawalFloorMinor: amount(env, 'WALLET_WITHDRAWAL_FLOOR_MINOR', 10_000),
+    withdrawalShareBps: amount(
+      env,
+      'WALLET_WITHDRAWAL_SHARE_BPS',
+      8000,
+      10_000,
+    ),
   };
   if (settings.minDepositMinor > settings.maxDepositMinor)
     throw new Error(

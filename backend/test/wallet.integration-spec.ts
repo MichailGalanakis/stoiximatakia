@@ -64,6 +64,8 @@ void describe('euro wallet against PostgreSQL', () => {
         maxDepositMinor: 100_000,
         minWithdrawalMinor: 1000,
         withdrawalsPerDay: 3,
+        withdrawalFloorMinor: 10_000,
+        withdrawalShareBps: 8000,
       })
       .overrideProvider(VERIFICATION_CONFIG)
       .useValue({
@@ -171,6 +173,7 @@ void describe('euro wallet against PostgreSQL', () => {
       availableMinor: number;
       reservedMinor: number;
       pendingWithdrawalMinor: number;
+      withdrawableMinor: number;
     }>();
   }
   async function startDeposit(p: Player, amountMinor: number) {
@@ -347,6 +350,7 @@ void describe('euro wallet against PostgreSQL', () => {
       reservedMinor: 0,
       pendingWithdrawalMinor: 2000,
       totalMinor: 5000,
+      withdrawableMinor: 3000,
     });
     const cancelled = await post(p, `withdrawals/${w1.withdrawal.id}/cancel`, {
       operationId: randomUUID(),
@@ -424,6 +428,7 @@ void describe('euro wallet against PostgreSQL', () => {
       reservedMinor: 0,
       pendingWithdrawalMinor: 0,
       totalMinor: 2000,
+      withdrawableMinor: 2000,
     });
     const list = (await get(p, 'withdrawals')).json<{
       withdrawals: { status: string }[];
@@ -436,6 +441,27 @@ void describe('euro wallet against PostgreSQL', () => {
     assert.equal((await withdraw(p, 1000)).statusCode, 201);
     const limited = await withdraw(p, 1000);
     assert.equal(limited.statusCode, 429);
+  });
+
+  void it('caps a withdrawal at €100 or 80% of the available balance', async () => {
+    const p = await funded(20_000);
+    assert.equal((await balance(p)).withdrawableMinor, 16_000);
+    const over = await withdraw(p, 16_001);
+    assert.equal(over.statusCode, 409);
+    assert.equal(
+      over.json<{ code: string }>().code,
+      'withdrawal_share_exceeded',
+    );
+    assert.equal((await withdraw(p, 16_000)).statusCode, 201);
+    // The rest is €40, under the €100 floor, so it can follow in full.
+    const rest = await balance(p);
+    assert.equal(rest.availableMinor, 4000);
+    assert.equal(rest.withdrawableMinor, 4000);
+    assert.equal((await withdraw(p, 4000)).statusCode, 201);
+
+    const q = await funded(11_000);
+    assert.equal((await balance(q)).withdrawableMinor, 10_000);
+    assert.equal((await withdraw(q, 10_001)).statusCode, 409);
   });
 
   void it('returns funds when the provider reports a failed payout', async () => {
@@ -479,6 +505,7 @@ void describe('euro wallet against PostgreSQL', () => {
       reservedMinor: 0,
       pendingWithdrawalMinor: 2000,
       totalMinor: 3000,
+      withdrawableMinor: 1000,
     });
   });
 

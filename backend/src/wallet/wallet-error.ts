@@ -8,6 +8,7 @@ export type WalletCode =
   | 'invalid_amount'
   | 'insufficient_funds'
   | 'withdrawal_limit_reached'
+  | 'withdrawal_share_exceeded'
   | 'operation_conflict'
   | 'withdrawal_not_found'
   | 'withdrawal_state_conflict'
