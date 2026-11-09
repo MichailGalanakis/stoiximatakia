@@ -7,9 +7,10 @@ import {
 } from './registration/registration-settings';
 import { RegistrationModule } from './registration/registration.module';
 import { PlatformModule } from './tables/platform.module';
+import { WalletModule } from './wallet/wallet.module';
 
 @Module({
-  imports: [RegistrationModule, PlatformModule],
+  imports: [RegistrationModule, PlatformModule, WalletModule],
   controllers: [HealthController],
   providers: [
     {

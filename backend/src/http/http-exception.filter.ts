@@ -9,6 +9,7 @@ import {
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { RegistrationError } from '../registration/registration-error';
 import { PlatformError } from '../tables/platform-error';
+import { WalletError } from '../wallet/wallet-error';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -41,7 +42,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message,
       requestId: request.id,
       ...(exception instanceof RegistrationError ||
-      exception instanceof PlatformError
+      exception instanceof PlatformError ||
+      exception instanceof WalletError
         ? {
             code: exception.code,
             ...(exception instanceof RegistrationError &&

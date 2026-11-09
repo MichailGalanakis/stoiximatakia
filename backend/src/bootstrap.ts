@@ -71,7 +71,8 @@ export async function createApplication(
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     createHttpAdapter(environment.trustedProxyHops),
-    { logger, bufferLogs: true },
+    // Payment webhooks verify signatures over the exact bytes received.
+    { logger, bufferLogs: true, rawBody: true },
   );
   configureApplication(app, logger);
   app.enableShutdownHooks();
