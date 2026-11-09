@@ -28,7 +28,19 @@ export type WalletCode =
   | 'tournament_underfilled'
   | 'already_registered'
   | 'not_registered'
-  | 'invalid_ranking';
+  | 'invalid_ranking'
+  | 'admin_forbidden'
+  | 'admin_exists'
+  | 'admin_not_found'
+  | 'correction_not_found'
+  | 'correction_decided'
+  | 'same_reviewer'
+  | 'deposit_not_found'
+  | 'dispute_not_found'
+  | 'dispute_exists'
+  | 'dispute_resolved'
+  | 'account_restricted'
+  | 'user_not_found';
 
 export class WalletError extends HttpException {
   constructor(

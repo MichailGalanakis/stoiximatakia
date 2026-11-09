@@ -31,6 +31,7 @@ import {
 } from '../registration/registration-settings';
 import { tokenDigest } from '../registration/registration.service';
 import { GAME_IDS, type GameId } from '../tables/game-catalog';
+import type { AdminRole } from '../wallet/admin';
 import { WalletError } from '../wallet/wallet-error';
 import { WalletStore } from '../wallet/wallet.store';
 import { TournamentStore } from './tournament.store';
@@ -57,7 +58,6 @@ class TournamentConfigDto {
   @Min(1, { each: true })
   @Max(10_000, { each: true })
   prizeShares!: number[];
-  @IsString() @Length(1, 80) changedBy!: string;
 }
 class CreateTournamentDto extends TournamentConfigDto {
   @IsUUID() id!: string;
@@ -149,58 +149,57 @@ export class TournamentAdminController {
     @Inject(WalletStore) private readonly wallet: WalletStore,
   ) {}
 
-  private admin(request: FastifyRequest, reply: FastifyReply) {
+  private admin(request: FastifyRequest, reply: FastifyReply, role: AdminRole) {
     reply.header('cache-control', 'no-store');
-    this.wallet.authorizeAdmin(request.headers.authorization);
+    return this.wallet.authorizeAdmin(request.headers.authorization, role);
   }
 
   @Get('tournaments')
-  dashboard(
+  async dashboard(
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
+    await this.admin(req, reply, 'viewer');
     return this.store.dashboard();
   }
   @Post('tournaments')
-  create(
+  async create(
     @Body() input: CreateTournamentDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
-    const { id, changedBy, ...config } = input;
-    return this.store.create(id, config, changedBy);
+    const actor = await this.admin(req, reply, 'finance');
+    const { id, ...config } = input;
+    return this.store.create(id, config, actor);
   }
   @Put('tournaments/:tournamentId')
-  update(
+  async update(
     @Param() params: TournamentIdDto,
     @Body() input: TournamentConfigDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
-    const { changedBy, ...config } = input;
-    return this.store.update(params.tournamentId, config, changedBy);
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.update(params.tournamentId, input, actor);
   }
   @Post('tournaments/:tournamentId/start')
   @HttpCode(200)
-  start(
+  async start(
     @Param() params: TournamentIdDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
-    return this.store.start(params.tournamentId);
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.start(params.tournamentId, actor);
   }
   @Post('tournaments/:tournamentId/cancel')
   @HttpCode(200)
-  cancel(
+  async cancel(
     @Param() params: TournamentIdDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
-    return this.store.cancel(params.tournamentId);
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.cancel(params.tournamentId, actor);
   }
 }

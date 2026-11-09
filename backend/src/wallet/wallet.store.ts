@@ -13,6 +13,27 @@ import {
   type ProviderEvent,
 } from './payment-provider';
 import {
+  adminTokenHash,
+  audit,
+  hasRole,
+  type AdminActor,
+  type AdminRole,
+} from './admin';
+import {
+  adminOpenDispute,
+  adminResolveDispute,
+  applyDisputeEvent,
+  auditLog,
+  createAdmin,
+  deactivateAdmin,
+  decideCorrection,
+  listCorrections,
+  listDisputes,
+  listReconciliations,
+  reconcile,
+  requestCorrection,
+} from './finance-controls';
+import {
   HOUSE_MATCH_COLUMNS,
   houseMatchView,
   settleHouseMatch,
@@ -334,6 +355,13 @@ export class WalletStore implements OnModuleDestroy {
           );
           if (recent.rows[0]!.count >= this.settings.withdrawalsPerDay)
             throw new WalletError('withdrawal_limit_reached', 429);
+          // Money must not leave while a deposit is contested.
+          const disputed = await c.query(
+            "SELECT 1 FROM deposit_disputes WHERE user_id=$1 AND status='open' LIMIT 1",
+            [actor.id],
+          );
+          if (disputed.rowCount)
+            throw new WalletError('account_restricted', 403);
           // Pay out through the method last used to deposit.
           const source = await c.query<{ provider: string }>(
             "SELECT provider FROM deposits WHERE user_id=$1 AND status='succeeded' ORDER BY created_at DESC,id LIMIT 1",
@@ -470,9 +498,16 @@ export class WalletStore implements OnModuleDestroy {
         [provider.id, event.id, event.type, JSON.stringify(event)],
       );
       if (!stored.rowCount) return { status: 'duplicate' } as const;
-      return event.type.startsWith('deposit.')
-        ? this.applyDepositEvent(c, provider.id, event)
-        : this.applyPayoutEvent(c, provider.id, event);
+      switch (event.type) {
+        case 'deposit.succeeded':
+        case 'deposit.failed':
+          return this.applyDepositEvent(c, provider.id, event);
+        case 'payout.succeeded':
+        case 'payout.failed':
+          return this.applyPayoutEvent(c, provider.id, event);
+        default:
+          return applyDisputeEvent(c, provider.id, event);
+      }
     });
   }
 
@@ -559,15 +594,40 @@ export class WalletStore implements OnModuleDestroy {
     return { status: 'processed' };
   }
 
-  authorizeAdmin(header: string | undefined): void {
-    const token = this.settings.adminToken;
-    if (!token) throw new WalletError('wallet_unavailable', 503);
-    const given = Buffer.from(
-      header?.startsWith('Bearer ') ? header.slice(7) : '',
-    );
-    const expected = Buffer.from(token);
-    if (given.length !== expected.length || !timingSafeEqual(given, expected))
-      throw new WalletError('admin_unauthorized', 401);
+  /**
+   * Named admins authenticate with their own token; WALLET_ADMIN_TOKEN remains a
+   * break-glass `root` admin. Every admin action is attributed to the actor.
+   */
+  async authorizeAdmin(
+    header: string | undefined,
+    required: AdminRole,
+  ): Promise<AdminActor> {
+    const token = header?.startsWith('Bearer ') ? header.slice(7) : '';
+    if (!token) throw new WalletError('admin_unauthorized', 401);
+    let actor: AdminActor | undefined;
+    const root = this.settings.adminToken;
+    if (root) {
+      const given = Buffer.from(token);
+      const expected = Buffer.from(root);
+      if (given.length === expected.length && timingSafeEqual(given, expected))
+        actor = { name: 'root', role: 'admin' };
+    }
+    if (!actor) {
+      if (!this.pool) throw new WalletError('wallet_unavailable', 503);
+      const { rows } = await this.pool
+        .query<AdminActor>(
+          'SELECT name,role FROM admin_users WHERE token_hash=$1 AND active',
+          [adminTokenHash(token)],
+        )
+        .catch(() => {
+          throw new WalletError('wallet_unavailable', 503);
+        });
+      actor = rows[0];
+    }
+    if (!actor) throw new WalletError('admin_unauthorized', 401);
+    if (!hasRole(actor, required))
+      throw new WalletError('admin_forbidden', 403);
+    return actor;
   }
 
   adminWithdrawals(status: string | undefined) {
@@ -589,11 +649,17 @@ export class WalletStore implements OnModuleDestroy {
     });
   }
 
-  approveWithdrawal(id: string, reviewer: string, note?: string) {
+  approveWithdrawal(id: string, actor: AdminActor, note?: string) {
+    const reviewer = actor.name;
     return this.transaction(async (c) => {
       const w = await this.lockWithdrawal(c, id);
       if (w.status !== 'requested')
         throw new WalletError('withdrawal_state_conflict', 409);
+      const disputed = await c.query(
+        "SELECT 1 FROM deposit_disputes WHERE user_id=$1 AND status='open' LIMIT 1",
+        [w.user_id],
+      );
+      if (disputed.rowCount) throw new WalletError('account_restricted', 403);
       const provider = this.providers.get(w.provider);
       if (!provider) throw new WalletError('wallet_unavailable', 503);
       const payout = await provider.createPayout({
@@ -606,18 +672,26 @@ export class WalletStore implements OnModuleDestroy {
          reviewed_by=$3,review_note=$4,updated_at=now() WHERE id=$1 RETURNING ${WITHDRAWAL_COLUMNS}`,
         [w.id, payout.providerReference, reviewer, note ?? null],
       );
+      await audit(c, actor, 'withdrawal.approve', w.id, {
+        amountMinor: w.amount_minor,
+        note: note ?? null,
+      });
       return { withdrawal: withdrawalView(rows[0]!) };
     });
   }
 
-  rejectWithdrawal(id: string, reviewer: string, note?: string) {
+  rejectWithdrawal(id: string, actor: AdminActor, note?: string) {
     return this.transaction(async (c) => {
       const w = await this.lockWithdrawal(c, id);
       if (w.status !== 'requested')
         throw new WalletError('withdrawal_state_conflict', 409);
       const updated = await this.release(c, w, 'rejected', undefined, {
-        reviewer,
+        reviewer: actor.name,
         note,
+      });
+      await audit(c, actor, 'withdrawal.reject', w.id, {
+        amountMinor: w.amount_minor,
+        note: note ?? null,
       });
       return { withdrawal: withdrawalView(updated) };
     });
@@ -644,10 +718,14 @@ export class WalletStore implements OnModuleDestroy {
         deposits: number;
         withdrawals: number;
         houseMatches: number;
+        disputes: number;
+        shortfallMinor: number;
       }>(
         `SELECT (SELECT count(*)::int FROM deposits WHERE status='pending') AS deposits,
                 (SELECT count(*)::int FROM withdrawal_requests WHERE status IN ('requested','processing')) AS withdrawals,
-                (SELECT count(*)::int FROM house_matches WHERE status='active') AS "houseMatches"`,
+                (SELECT count(*)::int FROM house_matches WHERE status='active') AS "houseMatches",
+                (SELECT count(*)::int FROM deposit_disputes WHERE status='open') AS "disputes",
+                (SELECT coalesce(sum(shortfall_minor),0)::float8 FROM deposit_disputes WHERE status='lost') AS "shortfallMinor"`,
       );
       return {
         currency: 'EUR',
@@ -676,19 +754,24 @@ export class WalletStore implements OnModuleDestroy {
         open: {
           deposits: open.rows[0]!.deposits,
           withdrawals: open.rows[0]!.withdrawals,
+          disputes: open.rows[0]!.disputes,
         },
+        // Lost chargebacks the player could not cover; absorbed by the company.
+        chargebackShortfallMinor: open.rows[0]!.shortfallMinor,
       };
     });
   }
 
   /** Moves company capital into or out of the reserve; never touches player funds. */
-  moveCapital(input: {
-    operationId: string;
-    direction: 'in' | 'out';
-    amountMinor: number;
-    reviewer: string;
-    note?: string | undefined;
-  }) {
+  moveCapital(
+    input: {
+      operationId: string;
+      direction: 'in' | 'out';
+      amountMinor: number;
+      note?: string | undefined;
+    },
+    actor: AdminActor,
+  ) {
     return this.transaction(async (c) => {
       const previous = await c.query<{
         direction: string;
@@ -728,11 +811,15 @@ export class WalletStore implements OnModuleDestroy {
           input.operationId,
           input.direction,
           input.amountMinor,
-          input.reviewer,
+          actor.name,
           input.note ?? null,
           tx,
         ],
       );
+      await audit(c, actor, `capital.${input.direction}`, input.operationId, {
+        amountMinor: input.amountMinor,
+        note: input.note ?? null,
+      });
       return { reserveMinor: await this.reserveOf(c) };
     });
   }
@@ -776,5 +863,62 @@ export class WalletStore implements OnModuleDestroy {
   /** Called only with the server's authoritative game result. */
   settleHouseMatch(matchId: string, outcome: HouseOutcome) {
     return this.transaction((c) => settleHouseMatch(c, matchId, outcome));
+  }
+
+  createAdmin(actor: AdminActor, name: string, role: AdminRole) {
+    return this.transaction((c) => createAdmin(c, actor, name, role));
+  }
+  deactivateAdmin(actor: AdminActor, name: string) {
+    return this.transaction((c) => deactivateAdmin(c, actor, name));
+  }
+  admins() {
+    return this.transaction(async (c) => {
+      const { rows } = await c.query(
+        'SELECT name,role,active,created_by AS "createdBy",created_at AS "createdAt" FROM admin_users ORDER BY name',
+      );
+      return { admins: rows };
+    });
+  }
+  auditLog(limit: number) {
+    return this.transaction((c) => auditLog(c, limit));
+  }
+  requestCorrection(
+    actor: AdminActor,
+    input: { id: string; userId: string; amountMinor: number; reason: string },
+  ) {
+    return this.transaction((c) => requestCorrection(c, actor, input));
+  }
+  decideCorrection(actor: AdminActor, id: string, approve: boolean) {
+    return this.transaction((c) => decideCorrection(c, actor, id, approve));
+  }
+  corrections(status?: string) {
+    return this.transaction((c) => listCorrections(c, status));
+  }
+  openDispute(actor: AdminActor, depositId: string, reason: string) {
+    return this.transaction((c) =>
+      adminOpenDispute(c, actor, depositId, reason),
+    );
+  }
+  resolveDispute(
+    actor: AdminActor,
+    id: string,
+    outcome: 'won' | 'lost',
+    note?: string,
+  ) {
+    return this.transaction((c) =>
+      adminResolveDispute(c, actor, id, outcome, note),
+    );
+  }
+  disputes(status?: string) {
+    return this.transaction((c) => listDisputes(c, status));
+  }
+  reconcile(
+    actor: AdminActor,
+    input: { provider: string; periodEnd: string; reportedHeldMinor: number },
+  ) {
+    return this.transaction((c) => reconcile(c, actor, input));
+  }
+  reconciliations() {
+    return this.transaction((c) => listReconciliations(c));
   }
 }

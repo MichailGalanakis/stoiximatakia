@@ -6,6 +6,7 @@ import {
   type RegistrationSettings,
 } from '../registration/registration-settings';
 import type { GameId } from '../tables/game-catalog';
+import { audit, type AdminActor } from '../wallet/admin';
 import { WalletError } from '../wallet/wallet-error';
 import { postWallet, userAccount } from '../wallet/wallet-ledger';
 
@@ -429,8 +430,9 @@ export class TournamentStore implements OnModuleDestroy {
     );
   }
 
-  create(id: string, config: TournamentConfig, by: string) {
+  create(id: string, config: TournamentConfig, actor: AdminActor) {
     if (!validConfig(config)) throw new WalletError('invalid_tournament', 400);
+    const by = actor.name;
     return this.transaction(async (c) => {
       const existing = await c.query<{ config: TournamentConfig }>(
         'SELECT config FROM tournament_changes WHERE tournament_id=$1 ORDER BY created_at LIMIT 1',
@@ -465,6 +467,7 @@ export class TournamentStore implements OnModuleDestroy {
         [poolAccount(id), feesAccount(id)],
       );
       await this.recordChange(c, id, by, config);
+      await audit(c, actor, 'tournament.create', id, { ...config });
       return {
         tournament: await this.view(c, await this.lockTournament(c, id)),
       };
@@ -472,8 +475,9 @@ export class TournamentStore implements OnModuleDestroy {
   }
 
   /** Prices and prizes can only change before anyone has bought a ticket. */
-  update(id: string, config: TournamentConfig, by: string) {
+  update(id: string, config: TournamentConfig, actor: AdminActor) {
     if (!validConfig(config)) throw new WalletError('invalid_tournament', 400);
+    const by = actor.name;
     return this.transaction(async (c) => {
       const t = await this.lockTournament(c, id);
       const sold = await c.query(
@@ -499,13 +503,14 @@ export class TournamentStore implements OnModuleDestroy {
       );
       await this.writeRules(c, id, config.prizeShares);
       await this.recordChange(c, id, by, config);
+      await audit(c, actor, 'tournament.update', id, { ...config });
       return {
         tournament: await this.view(c, await this.lockTournament(c, id)),
       };
     });
   }
 
-  start(id: string) {
+  start(id: string, actor: AdminActor) {
     return this.transaction(async (c) => {
       const t = await this.lockTournament(c, id);
       if (t.status !== 'open')
@@ -530,6 +535,10 @@ export class TournamentStore implements OnModuleDestroy {
         "UPDATE tournaments SET status='running',started_at=now(),start_transaction_id=$2,updated_at=now() WHERE id=$1",
         [id, tx],
       );
+      await audit(c, actor, 'tournament.start', id, {
+        players: active.length,
+        feesMinor: fees,
+      });
       return {
         tournament: await this.view(c, await this.lockTournament(c, id)),
       };
@@ -537,17 +546,22 @@ export class TournamentStore implements OnModuleDestroy {
   }
 
   /** Organiser cancellation refunds every active ticket in full. */
-  cancel(id: string) {
+  cancel(id: string, actor: AdminActor) {
     return this.transaction(async (c) => {
       const t = await this.lockTournament(c, id);
       if (t.status !== 'open' && t.status !== 'running')
         throw new WalletError('tournament_unavailable', 409);
-      for (const ticket of await this.activeTickets(c, id))
+      const tickets = await this.activeTickets(c, id);
+      for (const ticket of tickets)
         await this.refund(c, ticket, 'refunded', t.status === 'running');
       await c.query(
         "UPDATE tournaments SET status='cancelled',finished_at=now(),updated_at=now() WHERE id=$1",
         [id],
       );
+      await audit(c, actor, 'tournament.cancel', id, {
+        refundedTickets: tickets.length,
+        wasRunning: t.status === 'running',
+      });
       return {
         tournament: await this.view(c, await this.lockTournament(c, id)),
       };

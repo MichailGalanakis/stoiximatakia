@@ -18,12 +18,24 @@ import {
   type RegistrationSettings,
 } from '../registration/registration-settings';
 import { tokenDigest } from '../registration/registration.service';
+import type { AdminRole } from './admin';
 import {
+  AdminNameDto,
   AmountOperationDto,
+  AuditQueryDto,
   CapitalDto,
+  CorrectionDto,
+  CorrectionIdDto,
+  CreateAdminDto,
+  DecisionDto,
+  DisputeIdDto,
   HouseMatchFilterDto,
+  OpenDisputeDto,
   ProviderDto,
+  ReconcileDto,
+  ResolveDisputeDto,
   ReviewDto,
+  StatusFilterDto,
   WalletOperationDto,
   WithdrawalFilterDto,
   WithdrawalIdDto,
@@ -137,79 +149,199 @@ export class WalletController {
   }
 }
 
+/**
+ * Roles: viewer reads; finance moves money (approvals, capital, corrections,
+ * disputes, reconciliation); admin also manages admin accounts.
+ */
 @Controller('wallet/v1/admin')
 export class WalletAdminController {
   constructor(@Inject(WalletStore) private readonly store: WalletStore) {}
 
-  private admin(request: FastifyRequest, reply: FastifyReply) {
+  private admin(request: FastifyRequest, reply: FastifyReply, role: AdminRole) {
     reply.header('cache-control', 'no-store');
-    this.store.authorizeAdmin(request.headers.authorization);
+    return this.store.authorizeAdmin(request.headers.authorization, role);
   }
 
   @Get('summary')
-  summary(
+  async summary(
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
+    await this.admin(req, reply, 'viewer');
     return this.store.summary();
   }
   @Post('house/capital')
   @HttpCode(200)
-  capital(
+  async capital(
     @Body() input: CapitalDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
-    return this.store.moveCapital(input);
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.moveCapital(input, actor);
   }
   @Get('house/matches')
-  houseMatches(
+  async houseMatches(
     @Query() query: HouseMatchFilterDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
+    await this.admin(req, reply, 'viewer');
     return this.store.adminHouseMatches(query.status);
   }
   @Get('withdrawals')
-  withdrawals(
+  async withdrawals(
     @Query() query: WithdrawalFilterDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
+    await this.admin(req, reply, 'viewer');
     return this.store.adminWithdrawals(query.status);
   }
   @Post('withdrawals/:withdrawalId/approve')
   @HttpCode(200)
-  approve(
+  async approve(
     @Param() params: WithdrawalIdDto,
     @Body() input: ReviewDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
-    return this.store.approveWithdrawal(
-      params.withdrawalId,
-      input.reviewer,
-      input.note,
-    );
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.approveWithdrawal(params.withdrawalId, actor, input.note);
   }
   @Post('withdrawals/:withdrawalId/reject')
   @HttpCode(200)
-  reject(
+  async reject(
     @Param() params: WithdrawalIdDto,
     @Body() input: ReviewDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    this.admin(req, reply);
-    return this.store.rejectWithdrawal(
-      params.withdrawalId,
-      input.reviewer,
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.rejectWithdrawal(params.withdrawalId, actor, input.note);
+  }
+
+  @Get('admins')
+  async admins(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    await this.admin(req, reply, 'admin');
+    return this.store.admins();
+  }
+  @Post('admins')
+  async createAdmin(
+    @Body() input: CreateAdminDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'admin');
+    return this.store.createAdmin(actor, input.name, input.role);
+  }
+  @Post('admins/:name/deactivate')
+  @HttpCode(200)
+  async deactivateAdmin(
+    @Param() params: AdminNameDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'admin');
+    return this.store.deactivateAdmin(actor, params.name);
+  }
+  @Get('audit')
+  async audit(
+    @Query() query: AuditQueryDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    await this.admin(req, reply, 'viewer');
+    return this.store.auditLog(query.limit ?? 100);
+  }
+
+  @Get('corrections')
+  async corrections(
+    @Query() query: StatusFilterDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    await this.admin(req, reply, 'viewer');
+    return this.store.corrections(query.status);
+  }
+  @Post('corrections')
+  async requestCorrection(
+    @Body() input: CorrectionDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.requestCorrection(actor, input);
+  }
+  @Post('corrections/:correctionId/decision')
+  @HttpCode(200)
+  async decideCorrection(
+    @Param() params: CorrectionIdDto,
+    @Body() input: DecisionDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.decideCorrection(
+      actor,
+      params.correctionId,
+      input.decision === 'approve',
+    );
+  }
+
+  @Get('disputes')
+  async disputes(
+    @Query() query: StatusFilterDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    await this.admin(req, reply, 'viewer');
+    return this.store.disputes(query.status);
+  }
+  @Post('disputes')
+  async openDispute(
+    @Body() input: OpenDisputeDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.openDispute(actor, input.depositId, input.reason);
+  }
+  @Post('disputes/:disputeId/resolve')
+  @HttpCode(200)
+  async resolveDispute(
+    @Param() params: DisputeIdDto,
+    @Body() input: ResolveDisputeDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.resolveDispute(
+      actor,
+      params.disputeId,
+      input.outcome,
       input.note,
     );
+  }
+
+  @Get('reconciliations')
+  async reconciliations(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    await this.admin(req, reply, 'viewer');
+    return this.store.reconciliations();
+  }
+  @Post('reconciliations')
+  async reconcile(
+    @Body() input: ReconcileDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.reconcile(actor, input);
   }
 }
