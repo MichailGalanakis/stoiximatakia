@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { CONTRIBUTIONS_MINOR, GAME_IDS } from './game-catalog';
 import type { GameId } from './game-catalog';
+import { TABLE_CURRENCIES, type TableCurrency } from './table-ledger';
 
 export class OperationDto {
   @IsUUID() operationId!: string;
@@ -33,6 +34,7 @@ export class CreateTableDto extends OperationDto {
   @IsString() @Length(1, 16) formatId!: string;
   @IsIn(CONTRIBUTIONS_MINOR) prizeContributionMinor!: number;
   @IsOptional() @IsString() @Matches(/^[A-Za-z0-9]{6,32}$/) accessCode?: string;
+  @IsOptional() @IsIn(TABLE_CURRENCIES) currency?: TableCurrency;
 }
 export class SeatDto extends OperationDto {
   @IsInt() @Min(0) @Max(3) seatIndex!: number;
@@ -42,6 +44,7 @@ export class PrivateAccessDto {
 }
 export class ListTablesDto {
   @IsIn(GAME_IDS) gameId!: GameId;
+  @IsOptional() @IsIn(TABLE_CURRENCIES) currency?: TableCurrency;
 }
 export class TableIdDto {
   @IsUUID() tableId!: string;

@@ -8,6 +8,7 @@ export type LedgerKind =
   | 'withdrawal_paid'
   | 'stake_reserve'
   | 'stake_release'
+  | 'stake_commit'
   | 'settle';
 
 export interface Entry {

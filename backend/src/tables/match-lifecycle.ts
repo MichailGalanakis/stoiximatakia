@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
-import { postCredits } from '../credits/credit-ledger';
 import type { TableRow } from './platform.store';
+import {
+  feeAccount,
+  poolAccount,
+  poolBalance,
+  postTableMoney,
+} from './table-ledger';
 import { PlatformError } from './platform-error';
 
 export interface GameRow {
@@ -209,13 +214,7 @@ export async function concludeMatch(
   const refundFee = input.kind === 'cancel' || input.kind === 'void';
   const pool = table.capacity * table.contribution_minor,
     fees = table.capacity * table.entry_fee_minor;
-  const balance = (
-    await c.query<{ amount: string }>(
-      'SELECT balance_minor AS amount FROM credit_accounts WHERE key=$1',
-      ['pool:' + table.id],
-    )
-  ).rows[0];
-  if (Number(balance?.amount) !== pool)
+  if ((await poolBalance(c, table.currency, table.id)) !== pool)
     throw new Error('Match pool does not reconcile');
   const allocations = members.map((m) => ({
     userId: m.user_id,
@@ -241,25 +240,29 @@ export async function concludeMatch(
       JSON.stringify(input.evidence),
     ],
   );
-  const journal = await postCredits(c, {
+  const journal = await postTableMoney(c, table.currency, {
     operationKey: 'settle:' + id,
     kind: 'settle',
     referenceId: id,
-    ...(input.actor ? { actorId: input.actor } : {}),
+    actorId: input.actor,
     postings: [
-      { account: 'pool:' + table.id, amount: -pool },
-      ...(refundFee ? [{ account: 'fees', amount: -fees }] : []),
+      { account: poolAccount(table.currency, table.id), amount: -pool },
+      ...(refundFee
+        ? [{ account: feeAccount(table.currency), amount: -fees }]
+        : []),
       ...allocations
         .filter((a) => a.amount > 0)
         .map((a) => ({ account: 'available:' + a.userId, amount: a.amount })),
     ],
   });
+  const euro = table.currency === 'EUR';
   await c.query(
-    'INSERT INTO match_settlements(result_id,table_id,journal_id,total_paid_minor,fee_returned_minor) VALUES($1,$2,$3,$4,$5)',
+    'INSERT INTO match_settlements(result_id,table_id,journal_id,wallet_transaction_id,total_paid_minor,fee_returned_minor) VALUES($1,$2,$3,$4,$5,$6)',
     [
       id,
       table.id,
-      journal,
+      euro ? null : journal,
+      euro ? journal : null,
       pool + (refundFee ? fees : 0),
       refundFee ? fees : 0,
     ],

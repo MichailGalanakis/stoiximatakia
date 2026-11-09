@@ -1,7 +1,6 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { Pool, type PoolClient } from 'pg';
-import { postCredits } from '../credits/credit-ledger';
 import {
   REGISTRATION_SETTINGS,
   type RegistrationSettings,
@@ -18,6 +17,14 @@ import {
 import { PlatformError } from './platform-error';
 import { PLATFORM_SETTINGS, type PlatformSettings } from './platform-settings';
 import type { CreateTableDto } from './table.dto';
+import {
+  feeAccount,
+  openPool,
+  playerBalance,
+  poolAccount,
+  postTableMoney,
+  type TableCurrency,
+} from './table-ledger';
 import {
   advanceGame,
   checkRevision,
@@ -46,6 +53,7 @@ export interface TableRow {
   revision: number;
   created_at: Date;
   started_at: Date | null;
+  currency: TableCurrency;
 }
 export interface TableSnapshot {
   id: string;
@@ -58,6 +66,7 @@ export interface TableSnapshot {
   minPlayers: number;
   formatId: string;
   formatLabel: string;
+  currency: TableCurrency;
   entryFee: number;
   prizeContribution: number;
   createdAt: string;
@@ -312,16 +321,14 @@ export class PlatformStore implements OnModuleDestroy {
     }
   }
 
-  async balance(client: PoolClient, id: string) {
-    const { rows } = await client.query<{ kind: string; amount: number }>(
-      'SELECT kind,balance_minor::float8 AS amount FROM credit_accounts WHERE user_id=$1',
-      [id],
-    );
-    const availableMinor = rows.find((r) => r.kind === 'available')?.amount;
-    const reservedMinor = rows.find((r) => r.kind === 'reserved')?.amount;
-    if (availableMinor === undefined || reservedMinor === undefined)
-      throw new PlatformError('platform_unavailable', 503);
-    return { availableMinor, reservedMinor };
+  async balance(
+    client: PoolClient,
+    id: string,
+    currency: TableCurrency = 'credits',
+  ) {
+    const balance = await playerBalance(client, currency, id);
+    if (!balance) throw new PlatformError('platform_unavailable', 503);
+    return balance;
   }
 
   async snapshot(
@@ -369,6 +376,7 @@ export class PlatformStore implements OnModuleDestroy {
       minPlayers: table.capacity,
       formatId: table.format_id,
       formatLabel: game.formats[table.format_id]!,
+      currency: table.currency,
       entryFee: table.entry_fee_minor,
       prizeContribution: table.contribution_minor,
       createdAt: table.created_at.toISOString(),
@@ -410,15 +418,25 @@ export class PlatformStore implements OnModuleDestroy {
     };
   }
 
-  async list(hash: string, gameId: GameId) {
+  async list(
+    hash: string,
+    gameId: GameId,
+    currency: TableCurrency = 'credits',
+  ) {
     return this.session(hash, async (client, id) =>
-      this.lobby(client, id, gameId),
+      this.lobby(client, id, gameId, currency),
     );
   }
-  private async lobby(client: PoolClient, id: string, gameId: GameId) {
+  /** Lists one currency only, so a credit lobby never offers a euro table. */
+  private async lobby(
+    client: PoolClient,
+    id: string,
+    gameId: GameId,
+    currency: TableCurrency = 'credits',
+  ) {
     const { rows } = await client.query<{ id: string }>(
-      "SELECT id FROM game_tables WHERE game_id=$1 AND visibility='public' AND status IN ('waiting','playing') ORDER BY created_at DESC,id",
-      [gameId],
+      "SELECT id FROM game_tables WHERE game_id=$1 AND currency=$2 AND visibility='public' AND status IN ('waiting','playing') ORDER BY created_at DESC,id",
+      [gameId, currency],
     );
     const tables: TableSnapshot[] = [];
     for (const row of rows) {
@@ -433,10 +451,11 @@ export class PlatformStore implements OnModuleDestroy {
   async liveSnapshot(hash: string, gameId: GameId, tableId?: string) {
     return this.session(hash, async (c, u) => {
       if (tableId) await this.locked(c, tableId, u);
+      const table = tableId ? await this.snapshot(c, tableId, u) : null;
       return {
-        balance: await this.balance(c, u),
+        balance: await this.balance(c, u, table?.currency),
         ...(await this.lobby(c, u, gameId)),
-        table: tableId ? await this.snapshot(c, tableId, u) : null,
+        table,
         ...(tableId ? await this.playerMatch(c, tableId, u) : {}),
       };
     });
@@ -527,8 +546,10 @@ export class PlatformStore implements OnModuleDestroy {
         feeMinor: number;
         contributionMinor: number;
         state: string;
+        currency: TableCurrency;
       }>(
-        'SELECT id,table_id AS "tableId",fee_minor AS "feeMinor",contribution_minor AS "contributionMinor",state FROM table_tickets WHERE user_id=$1 ORDER BY created_at DESC,id DESC',
+        `SELECT k.id,k.table_id AS "tableId",k.fee_minor AS "feeMinor",k.contribution_minor AS "contributionMinor",k.state,t.currency
+         FROM table_tickets k JOIN game_tables t ON t.id=k.table_id WHERE k.user_id=$1 ORDER BY k.created_at DESC,k.id DESC`,
         [u],
       );
       return { tickets: rows };
@@ -594,9 +615,10 @@ export class PlatformStore implements OnModuleDestroy {
       );
       if (previous) return previous;
       const id = await run(c, u);
+      const table = await this.snapshot(c, id, u);
       const result: CommandResult = {
-        table: await this.snapshot(c, id, u),
-        balance: await this.balance(c, u),
+        table,
+        balance: await this.balance(c, u, table.currency),
         ...(await this.playerMatch(c, id, u)),
       };
       await c.query(
@@ -656,9 +678,13 @@ export class PlatformStore implements OnModuleDestroy {
       ).rowCount
     )
       throw new PlatformError('seat_unavailable', 409);
+    if (t.currency === 'EUR') await this.requireEuroEligible(c, u);
     const cost = t.entry_fee_minor + t.contribution_minor;
-    if ((await this.balance(c, u)).availableMinor < cost)
-      throw new PlatformError('insufficient_credits', 409);
+    if ((await this.balance(c, u, t.currency)).availableMinor < cost)
+      throw new PlatformError(
+        t.currency === 'EUR' ? 'insufficient_funds' : 'insufficient_credits',
+        409,
+      );
     const ticket = randomUUID();
     await c.query(
       'INSERT INTO table_tickets(id,table_id,user_id,fee_minor,contribution_minor) VALUES($1,$2,$3,$4,$5)',
@@ -672,7 +698,7 @@ export class PlatformStore implements OnModuleDestroy {
       'INSERT INTO table_access(table_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
       [t.id, u],
     );
-    await postCredits(c, {
+    await postTableMoney(c, t.currency, {
       operationKey: 'reserve:' + ticket,
       kind: 'reserve',
       actorId: u,
@@ -682,6 +708,14 @@ export class PlatformStore implements OnModuleDestroy {
         { account: 'reserved:' + u, amount: cost },
       ],
     });
+  }
+  /** Same rule as the wallet: real money needs a verified, registered account. */
+  private async requireEuroEligible(c: PoolClient, u: string) {
+    const { rows } = await c.query(
+      "SELECT 1 FROM users WHERE id=$1 AND account_kind='registered' AND (email_verified OR phone_verified)",
+      [u],
+    );
+    if (!rows.length) throw new PlatformError('account_not_eligible', 403);
   }
   private async locked(
     c: PoolClient,
@@ -717,6 +751,7 @@ export class PlatformStore implements OnModuleDestroy {
     )
       throw new PlatformError('invalid_table_request', 400);
     const code = input.accessCode ? this.codeHash(input.accessCode) : null;
+    const currency = input.currency ?? 'credits';
     // Fingerprints never persist plaintext access codes.
     return this.command(
       hash,
@@ -729,12 +764,13 @@ export class PlatformStore implements OnModuleDestroy {
         formatId: input.formatId,
         contribution: input.prizeContributionMinor,
         code,
+        currency,
       },
       async (c, u) => {
         const id = randomUUID();
         const { rows } = await c.query<TableRow>(
-          `INSERT INTO game_tables(id,creator_id,game_id,name,visibility,code_hash,format_id,capacity,entry_fee_minor,contribution_minor)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+          `INSERT INTO game_tables(id,creator_id,game_id,name,visibility,code_hash,format_id,capacity,entry_fee_minor,contribution_minor,currency)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
           [
             id,
             u,
@@ -746,6 +782,7 @@ export class PlatformStore implements OnModuleDestroy {
             game.seats,
             ENTRY_FEE_MINOR,
             input.prizeContributionMinor,
+            currency,
           ],
         );
         await this.reserve(c, u, rows[0]!, 0);
@@ -857,7 +894,7 @@ export class PlatformStore implements OnModuleDestroy {
         if (!ticket) throw new PlatformError('not_participating', 403);
         // Individual cancellation only; no implicit creator power over others.
         const cost = table.entry_fee_minor + table.contribution_minor;
-        await postCredits(c, {
+        await postTableMoney(c, table.currency, {
           operationKey: 'release:' + ticket,
           kind: 'release',
           actorId: u,
@@ -1368,11 +1405,8 @@ export class PlatformStore implements OnModuleDestroy {
           ],
         );
         await startHistory(c, id, u);
-        await c.query(
-          "INSERT INTO credit_accounts(key,kind) VALUES($1,'pool')",
-          ['pool:' + id],
-        );
-        await postCredits(c, {
+        await openPool(c, table.currency, id);
+        await postTableMoney(c, table.currency, {
           operationKey: 'start:' + id,
           kind: 'start',
           actorId: u,
@@ -1383,11 +1417,11 @@ export class PlatformStore implements OnModuleDestroy {
               amount: -(table.entry_fee_minor + table.contribution_minor),
             })),
             {
-              account: 'pool:' + id,
+              account: poolAccount(table.currency, id),
               amount: table.capacity * table.contribution_minor,
             },
             {
-              account: 'fees',
+              account: feeAccount(table.currency),
               amount: table.capacity * table.entry_fee_minor,
             },
           ],

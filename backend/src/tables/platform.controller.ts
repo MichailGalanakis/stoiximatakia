@@ -78,7 +78,11 @@ export class PlatformController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    return this.store.list(this.session(req, reply), query.gameId);
+    return this.store.list(
+      this.session(req, reply),
+      query.gameId,
+      query.currency ?? 'credits',
+    );
   }
   @Get('tables/:tableId')
   table(

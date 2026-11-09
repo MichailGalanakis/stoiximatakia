@@ -11,6 +11,8 @@ export type PlatformCode =
   | 'not_participating'
   | 'seat_unavailable'
   | 'insufficient_credits'
+  | 'insufficient_funds'
+  | 'account_not_eligible'
   | 'operation_conflict'
   | 'private_code_unavailable'
   | 'private_code_invalid'
