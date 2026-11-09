@@ -1,0 +1,39 @@
+{
+  "name": "@skillbetting/chess-engine",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Headless deterministic standard-chess rules, snapshots, replay and legal-action bots for SkillBetting.",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "test:deep": "node scripts/deep-perft.mjs",
+    "test:coverage": "node --experimental-test-coverage --test --test-concurrency=1 test/*.test.mjs",
+    "check": "npm run build && npm run test:types && npm test",
+    "demo": "node examples/play.mjs",
+    "cli": "node scripts/jsonl.mjs",
+    "test:types": "tsc --ignoreConfig --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 test/contracts.mts test/contracts.cts"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

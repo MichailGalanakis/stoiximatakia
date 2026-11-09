@@ -1,0 +1,117 @@
+{
+  "scope": "Locally validated analysis diagrams. Standard-start reachability is not established. Closed graphs use movement-rule edges without material, structural, repetition or move-count pruning; a promotion can be legal even when its result immediately stalemates the opponent.",
+  "dead": [
+    {
+      "id": "one-tempo-active-en-passant",
+      "fen": "kb6/p1p5/P1P5/5pP1/5P2/8/8/4K3 w - f6 0 1",
+      "expectedGraphNodes": 8,
+      "expectedGraphEdges": 7,
+      "expectedStalemates": 7
+    },
+    {
+      "id": "one-tempo-no-en-passant",
+      "fen": "kb6/p1p5/P1P5/5pP1/5P2/8/8/4K3 w - - 0 1",
+      "expectedGraphNodes": 7,
+      "expectedGraphEdges": 6,
+      "expectedStalemates": 6
+    },
+    {
+      "id": "two-tempo-active-en-passant",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/5P2/8/4K3 w - f6 0 1",
+      "expectedGraphNodes": 33,
+      "expectedGraphEdges": 53,
+      "expectedStalemates": 20
+    },
+    {
+      "id": "two-tempo-no-en-passant",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/5P2/8/4K3 w - - 0 1",
+      "expectedGraphNodes": 32,
+      "expectedGraphEdges": 52,
+      "expectedStalemates": 19
+    },
+    {
+      "id": "three-tempo-active-en-passant",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/5P2/4K3 w - f6 0 1",
+      "expectedGraphNodes": 94,
+      "expectedGraphEdges": 172,
+      "expectedStalemates": 49
+    },
+    {
+      "id": "three-tempo-no-en-passant",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/5P2/4K3 w - - 0 1",
+      "expectedGraphNodes": 93,
+      "expectedGraphEdges": 171,
+      "expectedStalemates": 48
+    },
+    {
+      "id": "finite-tempo-exact-automatic-boundary",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/P4P1P/4K3 w - - 0 1",
+      "expectedGraphNodes": 256,
+      "expectedGraphEdges": 524,
+      "expectedStalemates": 147
+    }
+  ],
+  "closings": [
+    {
+      "id": "king-retreat-one-tempo",
+      "fen": "1b6/pkp5/P1P5/5pP1/5P2/8/8/4K3 b - - 0 1",
+      "move": "b7a8",
+      "target": "one-tempo-no-en-passant"
+    },
+    {
+      "id": "king-retreat-two-tempo",
+      "fen": "1b6/pkp5/P1P5/5pP1/8/5P2/8/4K3 b - - 0 1",
+      "move": "b7a8",
+      "target": "two-tempo-no-en-passant"
+    },
+    {
+      "id": "king-retreat-three-tempo",
+      "fen": "1b6/pkp5/P1P5/5pP1/8/8/5P2/4K3 b - - 0 1",
+      "move": "b7a8",
+      "target": "three-tempo-no-en-passant"
+    }
+  ],
+  "live": [
+    {
+      "id": "mate-among-many-stalemating-alternatives",
+      "fen": "kb6/p1p5/P1P5/1Q3pP1/5P2/8/8/4K3 w - f6 0 1",
+      "winner": "white",
+      "witness": ["b5b7"],
+      "stalematingAlternative": "e1d1",
+      "continuingAlternative": "b5b6"
+    },
+    {
+      "id": "pawn-sacrifice-releases-a-promotion-mate",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/3P1P1P/4K3 w - - 0 1",
+      "winner": "white",
+      "witness": [
+        "d2d4",
+        "f5f4",
+        "d4d5",
+        "f4f3",
+        "d5d6",
+        "c7d6",
+        "c6c7",
+        "d6d5",
+        "c7c8q",
+        "d5d4",
+        "c8b7"
+      ]
+    },
+    {
+      "id": "opponent-promotion-after-capture-mates",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/3PPP1P/4K3 w - - 0 1",
+      "winner": "black",
+      "witness": [
+        "e1f1",
+        "f5f4",
+        "e2e3",
+        "f4e3",
+        "f1g2",
+        "e3f2",
+        "g2h1",
+        "f2f1q"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "scope": "Locally validated analysis diagrams; standard-start reachability is not established. Rank/color reversal preserves standard castling. No unadjusted horizontal reflection is used.",
+  "dead": [
+    {
+      "id": "reported-queenside-knight-cage",
+      "fen": "6bk/8/8/8/p1p1p1p1/P1PpP1P1/P2P4/RNB1K3 w Q - 0 1",
+      "right": "Q",
+      "permanentBlocker": "b1",
+      "expectedGraphNodes": 18848,
+      "expectedGraphEdges": 136736
+    },
+    {
+      "id": "kingside-knight-cage",
+      "fen": "kb6/8/8/8/1p1p1p1p/1P1PpP1P/4P2P/4KBNR w K - 0 1",
+      "right": "K",
+      "permanentBlocker": "g1"
+    },
+    {
+      "id": "queenside-bishop-blocker",
+      "fen": "6bk/8/8/8/p1p1p1p1/P1P1P1P1/P1P5/RB2K3 w Q - 0 1",
+      "right": "Q",
+      "permanentBlocker": "b1"
+    },
+    {
+      "id": "queenside-mutual-bishop-cage",
+      "fen": "6bk/8/8/8/p1p1p1p1/P1PpP1P1/PB1P4/RNB1K3 w Q - 0 1",
+      "right": "Q",
+      "permanentBlocker": "b1"
+    }
+  ],
+  "closings": [
+    {
+      "id": "queenside-pawn-closing",
+      "fen": "6bk/8/8/8/p1ppp1p1/P1P1P1P1/P2P4/RNB1K3 b Q - 0 1",
+      "move": "d4d3",
+      "target": "reported-queenside-knight-cage"
+    },
+    {
+      "id": "kingside-pawn-closing",
+      "fen": "kb6/8/8/8/1p1ppp1p/1P1P1P1P/4P2P/4KBNR b K - 0 1",
+      "move": "e4e3",
+      "target": "kingside-knight-cage"
+    }
+  ],
+  "live": [
+    {
+      "id": "temporary-kingside-knight-blocker",
+      "fen": "4rkr1/4p1p1/8/8/8/2B5/8/4K1NR w K - 0 1",
+      "winner": "white",
+      "witness": ["g1h3", "g7g6", "e1g1"],
+      "right": "K",
+      "castle": "e1g1",
+      "initiallyLegalCastle": false
+    },
+    {
+      "id": "temporary-queenside-knight-blocker",
+      "fen": "2rkr3/2p1p3/8/8/5B2/8/8/RN2K3 w Q - 0 1",
+      "winner": "white",
+      "witness": ["b1a3", "c7c6", "e1c1"],
+      "right": "Q",
+      "castle": "e1c1",
+      "initiallyLegalCastle": false
+    },
+    {
+      "id": "temporary-kingside-transit-attacker",
+      "fen": "4rkr1/4p1p1/8/8/8/2B4b/5N2/4K2R w K - 0 1",
+      "winner": "white",
+      "witness": ["f2h3", "g7g6", "e1g1"],
+      "right": "K",
+      "castle": "e1g1",
+      "initiallyLegalCastle": false
+    },
+    {
+      "id": "temporary-queenside-transit-attacker",
+      "fen": "2rkr3/2p1p3/8/8/5B2/1b6/3N4/R3K3 w Q - 0 1",
+      "winner": "white",
+      "witness": ["d2b3", "c7c6", "e1c1"],
+      "right": "Q",
+      "castle": "e1c1",
+      "initiallyLegalCastle": false
+    },
+    {
+      "id": "one-right-permanently-blocked-other-right-mates",
+      "fen": "4rkr1/4p1p1/8/8/p1p5/P1Pp4/P2P4/RN2K2R w KQ - 0 1",
+      "winner": "white",
+      "witness": ["e1g1"],
+      "right": "KQ",
+      "castle": "e1g1",
+      "initiallyLegalCastle": true
+    }
+  ],
+  "unusableEp": {
+    "fen": "6bk/8/8/p7/p1p1p1p1/P1PpP1P1/P2P4/RNB1K3 w Q a6 0 2",
+    "right": "Q",
+    "ep": "a6"
+  }
+}

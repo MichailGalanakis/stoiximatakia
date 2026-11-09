@@ -1,0 +1,6 @@
+{
+  "source": "https://github.com/miguel-ambrona/chasolver/issues/48",
+  "description": "Published July 2026 proof game for a dead bishop-and-pawn position. Board moves after the first dead position are historical construction only, not valid continued gameplay.",
+  "fen": "3k1b2/2p1pBp1/KpP1P1P1/1P3B2/4B1B1/5B2/8/8 w - - 3 57",
+  "pgn": "1. a4 a5 2. d4 b6 3. Qd2 h5 4. Qxa5 f5 5. Qxf5 d5 6. Qxd5 Rh7 7. a5 Rh8 8. a6 Bb7 9. axb7 Rh7 10. bxa8=B Qd6 11. h4 Qf6 12. f4 Qf7 13. Qxh5 Rh8 14. Qa5 Rh7 15. h5 Rh8 16. h6 Nf6 17. h7 Rg8 18. hxg8=B Qa2 19. Bf3 Qxa1 20. d5 Qxb1 21. d6 Nbd7 22. Ba2 Ne5 23. d7+ Kd8 24. g4 Nc4 25. g5 Nd6 26. f5 Nc8 27. dxc8=B Ng8 28. f6 Qxc1+ 29. Kf2 Qb1 30. f7 Qc1 31. fxg8=B Qb1 32. g6 Qc1 33. e4 Qb1 34. e5 Qc1 35. e6 Qb1 36. Bf7 Qc1 37. Bca6 Qb1 38. Bad3 Qc1 39. Bf5 Qb1 40. B3g4 Qc1 41. B1d3 Qb1 42. Bde4 Qxg1+ 43. Ke2 Qxh1 44. Kd3 Qg1 45. Kc4 Qh1 46. Kb5 Qg1 47. Ka6 Qh1 48. b4 Qg1 49. b5 Qh1 50. c4 Qg1 51. c5 Qh1 52. c6 Qg1 53. Qe1 Qxe1 54. Bc4 Qe2 55. Bcxe2 Kc8 56. B2f3 Kd8 *"
+}

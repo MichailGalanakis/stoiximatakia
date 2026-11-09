@@ -1,0 +1,132 @@
+{
+  "source": "Original regression diagrams, not claimed to be historical games; see docs/DEAD_POSITIONS.md.",
+  "dead": [
+    {
+      "id": "original-pawn-wall",
+      "fen": "7k/8/8/1p1p1p1p/pPpPpPpP/P1P1P1P1/8/K7 w - - 0 1",
+      "certificate": "permanent-pawn-wall-no-check"
+    },
+    {
+      "id": "v010-missed-bishop-wall",
+      "fen": "7k/8/8/1p1p1p1p/pPpPpPpP/P1P1P1P1/8/K1B5 w - - 0 1",
+      "certificate": "permanent-pawn-wall-no-check"
+    },
+    {
+      "id": "both-home-bishops",
+      "fen": "6bk/8/8/1p1p1p1p/pPpPpPpP/P1P1P1P1/8/K1B5 w - - 0 1",
+      "certificate": "permanent-pawn-wall-no-check"
+    },
+    {
+      "id": "invading-bishop-safe-escapes",
+      "fen": "7k/2B5/8/1p1p1p1p/pPpPpPpP/P1P1P1P1/8/K7 w - - 0 1",
+      "certificate": "permanent-pawn-wall-escape-squares"
+    },
+    {
+      "id": "both-invading-bishops",
+      "fen": "7k/2B5/8/1p1p1p1p/pPpPpPpP/P1P1P1P1/6b1/K7 w - - 0 1",
+      "certificate": "permanent-pawn-wall-escape-squares"
+    },
+    {
+      "id": "in-check-but-mate-impossible",
+      "fen": "7k/6B1/8/1p1p1p1p/pPpPpPpP/P1P1P1P1/8/K7 b - - 0 1",
+      "certificate": "permanent-pawn-wall-escape-squares"
+    },
+    {
+      "id": "sparse-pawn-wall",
+      "fen": "7k/8/8/p1p1p1p1/P1P1P1P1/8/8/K7 w - - 0 1",
+      "certificate": "permanent-pawn-wall-no-check"
+    },
+    {
+      "id": "mobile-reserve-pawn",
+      "fen": "7k/8/8/p1p1p1p1/P1P1P1P1/8/P7/K7 w - - 0 1",
+      "certificate": "permanent-pawn-wall-no-check"
+    },
+    {
+      "id": "eight-mobile-reserve-pawns",
+      "fen": "7k/p1p1p1p1/8/p1p1p1p1/P1P1P1P1/8/P1P1P1P1/K7 w - - 0 1",
+      "certificate": "permanent-pawn-wall-no-check"
+    },
+    {
+      "id": "immobile-rook-knight-cage",
+      "fen": "6bk/8/8/8/p1p1p1p1/P1PpP1P1/P2P4/RN5K w - - 0 1",
+      "expectedGraphNodes": 9920,
+      "certificate": "permanent-blocker-no-check",
+      "expectedGraphEdges": 66432
+    },
+    {
+      "id": "immobile-rook-bishop-cage",
+      "fen": "6bk/8/8/8/p1p1p1p1/P1P1P1P1/P1P5/RB5K w - - 0 1",
+      "certificate": "permanent-blocker-no-check"
+    },
+    {
+      "id": "mutually-blocked-queen-knight-bishops",
+      "fen": "6bk/8/8/8/p1p1p1p1/P1PpP1P1/PB1P4/QNB4K w - - 0 1",
+      "certificate": "permanent-blocker-no-check"
+    },
+    {
+      "id": "fixed-cage-with-invading-bishop-escapes",
+      "fen": "7k/2B5/8/8/p1p1p1p1/P1PpP1P1/P2P4/RN5K w - - 0 1",
+      "certificate": "permanent-blocker-escape-squares"
+    },
+    {
+      "id": "two-bishops-same-compartment-occupancy-correlation",
+      "fen": "7k/8/8/1p1p1p1p/pPpPpPpP/P1P1P1P1/6b1/K1B5 w - - 0 1",
+      "expectedGraphNodes": 66048,
+      "expectedGraphEdges": 436304,
+      "certificate": "permanent-pawn-wall-escape-sets",
+      "scope": "Analysis diagram; no verified standard-start history. Occupancy-correlation fix in v0.1.3."
+    }
+  ],
+  "liveSacrifice": {
+    "id": "bishop-sacrifice-breaks-apparent-wall",
+    "fen": "7k/8/8/1p1p1p1p/pPpPpPpP/P1P1P1P1/8/KB6 w - - 0 1",
+    "winner": "black",
+    "witness": [
+      "b1d3",
+      "c4d3",
+      "a1b2",
+      "d3d2",
+      "b2a1",
+      "d2d1q",
+      "a1b2",
+      "d1f3",
+      "c3c4",
+      "f3h1",
+      "b2c3",
+      "h1c1"
+    ]
+  },
+  "liveCageSacrifice": {
+    "id": "missing-blocker-rook-sacrifice-promotion-mate",
+    "fen": "6bk/8/8/8/p1p1p1p1/P1PpP1P1/3P4/RN5K w - - 0 1",
+    "winner": "black",
+    "witness": [
+      "a1a2",
+      "g8f7",
+      "a2c2",
+      "d3c2",
+      "h1g1",
+      "c2c1q",
+      "g1h2",
+      "c1d2",
+      "h2h1",
+      "d2e3",
+      "b1d2",
+      "e3g3",
+      "d2b1",
+      "g3f3",
+      "h1g1",
+      "h8g7",
+      "b1d2",
+      "g7f6",
+      "d2b1",
+      "f6f5",
+      "b1d2",
+      "f5f4",
+      "d2b1",
+      "f4g3",
+      "b1d2",
+      "f3g2"
+    ]
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "date": "2026-11-02",
+  "recordedAt": "2026-11-02T10:46:58.484Z",
+  "scope": "Local disposable Docker verification only. No remote deployment, public DNS/ACME certificate or production data claim.",
+  "platform": {
+    "os": "linux",
+    "architecture": "arm64",
+    "docker": "29.8.2",
+    "compose": "5.5.1"
+  },
+  "imageIds": {
+    "backend": "sha256:1d29506bb77253eb0255eb855e469c5484c3dc6cf904a994d188d73fd3157e2f",
+    "frontend": "sha256:4d3abc6b5e4d76bb8dcabb5ad4cc81005aa78311aa3f997f2fc0218ad6c73672"
+  },
+  "services": {
+    "postgres": {
+      "image": "postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5",
+      "imageId": "sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5",
+      "user": "",
+      "readOnlyRoot": true,
+      "health": "healthy",
+      "ports": {
+        "5432/tcp": null
+      }
+    },
+    "backend": {
+      "image": "skillbetting-backend:skillbetting-smoke-91706",
+      "imageId": "sha256:1d29506bb77253eb0255eb855e469c5484c3dc6cf904a994d188d73fd3157e2f",
+      "user": "node",
+      "readOnlyRoot": true,
+      "health": "healthy",
+      "ports": {
+        "3000/tcp": null
+      }
+    },
+    "frontend": {
+      "image": "skillbetting-frontend:skillbetting-smoke-91706",
+      "imageId": "sha256:4d3abc6b5e4d76bb8dcabb5ad4cc81005aa78311aa3f997f2fc0218ad6c73672",
+      "user": "node",
+      "readOnlyRoot": true,
+      "health": "healthy",
+      "ports": {
+        "3000/tcp": null
+      }
+    },
+    "edge": {
+      "image": "caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5",
+      "imageId": "sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5",
+      "user": "",
+      "readOnlyRoot": true,
+      "health": "healthy",
+      "ports": {
+        "2019/tcp": null,
+        "443/tcp": null,
+        "443/udp": null,
+        "80/tcp": null
+      }
+    },
+    "backup": {
+      "image": "postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5",
+      "imageId": "sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5",
+      "user": "",
+      "readOnlyRoot": true,
+      "health": "healthy",
+      "ports": {
+        "5432/tcp": null
+      }
+    }
+  },
+  "configTests": {
+    "passed": 5,
+    "scope": "actual Compose serialization plus tamper cases; secret overwrite/permissions, private networking/ports, migration ordering, TLS origin and isolated smoke topology"
+  },
+  "smoke": {
+    "initialProject": "skillbetting-smoke-89518",
+    "finalProject": "skillbetting-smoke-91706",
+    "httpsVerifiedWithExplicitLocalCa": true,
+    "tlsVerificationDisabled": false,
+    "secureHostCookies": true,
+    "previewAndQa404": true,
+    "privateCodeAndIndependentViews": true,
+    "unfinishedChess503WithoutFunds": true,
+    "websocketUpgradeAndSubscribe": true,
+    "legalActionAndIdenticalRetry": true,
+    "forfeitSettlementAndIdenticalRetry": true,
+    "balancesMinor": [24810, 25010],
+    "reservedMinor": 0,
+    "backupAndFullRestoreLedgerReconciliation": true,
+    "stagedReplaceAndPostRestoreWrites": true
+  },
+  "targetedFollowup": {
+    "corruptArchiveRejectedBeforeCurrentDataChanged": true,
+    "existingUsersRetained": 4,
+    "atomicTransactionalDatabaseRenamePassed": true,
+    "previousDatabaseRetainedWithConnectionsDisabled": true,
+    "appCurrentUser": "skillbetting_app",
+    "publicSchemaDdlDeniedSqlstate": "42501",
+    "migrationMetadataUpdateDeniedSqlstate": "42501",
+    "httpsReadyAfterAtomicRestore": true,
+    "changedReleaseBindPreservedPostgresContainerId": true
+  },
+  "officialImages": {
+    "node": "node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c",
+    "postgres": "postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5",
+    "caddy": "caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5"
+  },
+  "remaining": [
+    "server-agent deployment and public DNS/ACME/browser verification",
+    "off-server encrypted backup destination configuration",
+    "target server architecture build/runtime verification if different from tested linux/arm64"
+  ],
+  "cleanup": "Completed: both owned smoke projects, their synthetic data/TLS/backup volumes, temporary settings/source extraction/archive/logs and test-only image tags removed. Other Docker projects, official base images/build cache and development data preserved.",
+  "productionCaddyValidation": true,
+  "sourceBundleAudit": {
+    "files": 247,
+    "forbiddenFiles": 0,
+    "frontendPublicFiles": 68,
+    "serverAgentHandoff": true,
+    "productionMigrationWrapper": true,
+    "scope": "Temporary audit snapshot only; parent generates the final durable release archive after all source is frozen.",
+    "dockerBuildFromExtractedTrimmedArchive": true,
+    "noLocalReferenceOrDependencies": true,
+    "finalBundleAddsSafeContainerEvidence": true,
+    "portableMetadataFollowup": {
+      "bug": "macOS tar AppleDouble sidecars can become unexpected Linux source/public files",
+      "failedBefore": true,
+      "explicitMetadataInputsFiltered": true,
+      "tarCopyfileDisabled": true,
+      "regressionPassedAfter": true
+    }
+  }
+}

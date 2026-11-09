@@ -1,0 +1,31 @@
+{
+  "description": "Independently verified cooperative mating witnesses for the legal issue48 LIVE root. Diagnostic proof data only; never a runtime position exception or authoritative result.",
+  "source": {
+    "issue": "https://github.com/miguel-ambrona/chasolver/issues/48",
+    "analyzer": "https://chasolver.org/analyzer",
+    "wasm": "https://chasolver.org/chasolver-wasm/chasolver_wasm_bg.wasm",
+    "originalWasmSha256": "081058ad7bedcf690257f6cc4c81c4845b5706319504442142c52241be835fe4",
+    "method": "Public WASM run locally with only its two i64 2^24 node-limit constants raised to 2^26; patched binary is not retained or shipped. Every returned move was independently replayed in chess.js and the SkillBetting public engine action API, with no earlier outcome."
+  },
+  "fen": "1Bb5/1p6/pPp3k1/2Pp3p/P2PpBpP/4P1P1/5K2/8 w - - 0 1",
+  "verification": {
+    "engineVersion": "0.3.0",
+    "rulesVersion": "skillbetting.chess.fide-2023.v2",
+    "chessJsVersion": "1.4.0",
+    "searchNodeLimit": 67108864
+  },
+  "witnesses": {
+    "white": {
+      "plies": 79,
+      "uci": "f4e5 c8f5 e5f4 g6g7 f4g5 f5h7 f2e1 g7h8 e1d2 h7f5 d2c3 f5h7 c3b4 a6a5 b4a5 h7f5 a5b4 f5e6 a4a5 e6g8 a5a6 b7a6 b6b7 a6a5 b4a5 g8e6 a5b4 e6f5 b4c3 f5c8 b7c8q h8g7 c8g4 h5g4 h4h5 g7f7 h5h6 f7e6 h6h7 e6f5 h7h8q f5g6 h8h1 g6g7 g5h4 g7h8 h1f3 e4f3 e3e4 f3f2 e4d5 f2f1q d5c6 f1b1 d4d5 b1c1 c3d4 c1b1 d5d6 b1c1 c6c7 c1b1 c5c6 b1c1 d6d7 c1b1 c7c8q h8g7 c6c7 b1c1 d7d8q c1b1 c8g4 b1g6 c7c8q g6g5 h4g5 g7g6 d8g8",
+      "san": "Bfe5 Bf5 Bf4 Kg7 Bg5 Bh7 Ke1 Kh8 Kd2 Bf5 Kc3 Bh7 Kb4 a5+ Kxa5 Bf5 Kb4 Be6 a5 Bg8 a6 bxa6 b7 a5+ Kxa5 Be6 Kb4 Bf5 Kc3 Bc8 bxc8=Q+ Kg7 Qxg4 hxg4 h5 Kf7 h6 Ke6 h7 Kf5 h8=Q Kg6 Qh1 Kg7 Bh4 Kh8 Qf3 exf3 e4 f2 exd5 f1=Q dxc6 Qb1 d5 Qc1+ Kd4 Qb1 d6 Qc1 c7 Qb1 c6 Qc1 d7 Qb1 c8=Q+ Kg7 c7 Qc1 d8=Q Qb1 Qxg4+ Qg6 c8=Q Qg5 Bxg5 Kg6 Qg8#",
+      "terminalFen": "1BQ3Q1/8/6k1/6B1/3K2Q1/6P1/8/8 b - - 2 40"
+    },
+    "black": {
+      "plies": 84,
+      "uci": "b8e5 g6f5 e5f6 f5f6 f4e5 f6f5 e5f6 f5f6 f2e2 f6f5 e2d2 f5e6 d2c3 e6f5 c3b4 a6a5 b4a5 c8d7 a5b4 d7c8 b4c3 c8d7 c3d2 d7c8 d2e2 c8d7 e2f2 d7c8 f2g2 c8d7 g2h1 f5e6 a4a5 e6f5 a5a6 b7a6 b6b7 a6a5 b7b8q a5a4 b8a8 a4a3 a8b8 a3a2 b8a8 a2a1q h1g2 a1d4 e3d4 e4e3 a8b8 e3e2 b8a8 e2e1q a8b8 e1g3 g2f1 g3b8 f1e2 g4g3 e2d3 g3g2 d3c3 g2g1q c3d3 d7c8 d3e2 c8b7 e2f3 b8d6 c5d6 c6c5 d6d7 c5c4 d7d8q c4c3 d8a8 c3c2 a8b8 c2c1q b8a8 b7a8 f3e2 c1e3",
+      "san": "Bbe5 Kf5 Bf6 Kxf6 Be5+ Kf5 Bf6 Kxf6 Ke2 Kf5 Kd2 Ke6 Kc3 Kf5 Kb4 a5+ Kxa5 Bd7 Kb4 Bc8 Kc3 Bd7 Kd2 Bc8 Ke2 Bd7 Kf2 Bc8 Kg2 Bd7 Kh1 Ke6 a5 Kf5 a6 bxa6 b7 a5 b8=Q a4 Qa8 a3 Qb8 a2 Qa8 a1=Q+ Kg2 Qxd4 exd4 e3 Qb8 e2 Qa8 e1=Q Qb8 Qxg3+ Kf1 Qxb8 Ke2 g3 Kd3 g2 Kc3 g1=Q Kd3 Bc8 Ke2 Bb7 Kf3 Qd6 cxd6 c5 d7 c4 d8=Q c3 Qa8 c2 Qb8 c1=Q Qa8 Bxa8 Ke2 Qce3#",
+      "terminalFen": "b7/8/8/3p1k1p/3P3P/4q3/4K3/6q1 w - - 2 43"
+    }
+  }
+}

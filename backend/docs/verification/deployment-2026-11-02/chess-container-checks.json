@@ -1,0 +1,156 @@
+{
+  "recordedAt": "2026-11-02T19:42:38.413400+00:00",
+  "scope": "Local disposable Docker verification of the seven-game release. No remote deployment, public DNS/ACME, production data or physical-device claim.",
+  "project": "skillbetting-smoke-51065",
+  "platform": {
+    "os": "linux",
+    "architecture": "aarch64",
+    "docker": "29.8.2",
+    "compose": "5.5.1"
+  },
+  "imageConfigDigestsFromBuildLog": {
+    "backend": "sha256:4330c97cc45d6cd7677400f5ac834989277ac3c68c4d4be9c383fa77a83d7fa8",
+    "frontend": "sha256:e52ecfbcbf17b9bde3ac317d20a6ec297e6fd22888244eaa312257a8ad0b3961"
+  },
+  "runtimeContainerSnapshot": "Not captured before automatic cleanup; no inspected runtime user/read-only/port metadata is claimed here. Compose configuration and tamper checks pass separately.",
+  "checks": {
+    "frontend": 535,
+    "backendUnitAndHttp": 109,
+    "chessEngine": 606,
+    "cardEngines": 455,
+    "postgresqlBaseline": 176,
+    "postgresqlSuites": 13,
+    "artifactProfileMultiplayer": 19,
+    "deploymentConfiguration": 6
+  },
+  "smokeResults": [
+    {
+      "status": "passed",
+      "https": true,
+      "secureCookies": true,
+      "privateTable": true,
+      "ownHandsOnly": true,
+      "invalidGameBlockedWithoutFunds": true,
+      "databaseLeastPrivilege": true,
+      "websocketUpgrade": true,
+      "legalMoveRetry": true,
+      "settlementRetry": true,
+      "balances": [
+        {
+          "availableMinor": 24810,
+          "reservedMinor": 0
+        },
+        {
+          "availableMinor": 25010,
+          "reservedMinor": 0
+        }
+      ],
+      "chess": {
+        "engineVersion": "0.4.0-strict.2",
+        "schemaVersion": 3,
+        "standardStart": true,
+        "privateViews": true,
+        "exactMoveRetry": true,
+        "playingPlies": 2,
+        "artifactRefs": 3,
+        "artifacts": 3,
+        "proofRowsImmutable": true,
+        "balances": [
+          {
+            "availableMinor": 24620,
+            "reservedMinor": 0
+          },
+          {
+            "availableMinor": 24820,
+            "reservedMinor": 0
+          }
+        ]
+      },
+      "restoredChess": {
+        "resumed": false
+      },
+      "resultIdHash": "62c73f86b62bcb682ae3d409f7d2374b7967face33726e6bf04b70422d75997f"
+    },
+    {
+      "status": "passed",
+      "https": true,
+      "secureCookies": true,
+      "privateTable": true,
+      "ownHandsOnly": true,
+      "invalidGameBlockedWithoutFunds": true,
+      "databaseLeastPrivilege": true,
+      "websocketUpgrade": true,
+      "legalMoveRetry": true,
+      "settlementRetry": true,
+      "balances": [
+        {
+          "availableMinor": 24810,
+          "reservedMinor": 0
+        },
+        {
+          "availableMinor": 25010,
+          "reservedMinor": 0
+        }
+      ],
+      "chess": {
+        "engineVersion": "0.4.0-strict.2",
+        "schemaVersion": 3,
+        "standardStart": true,
+        "privateViews": true,
+        "exactMoveRetry": true,
+        "playingPlies": 2,
+        "artifactRefs": 3,
+        "artifacts": 3,
+        "proofRowsImmutable": true,
+        "balances": [
+          {
+            "availableMinor": 24620,
+            "reservedMinor": 0
+          },
+          {
+            "availableMinor": 24820,
+            "reservedMinor": 0
+          }
+        ]
+      },
+      "restoredChess": {
+        "resumed": true,
+        "oldArtifactsColdVerified": 3,
+        "proofArtifactsPreserved": true,
+        "exactTerminalRetry": true,
+        "balances": [
+          {
+            "availableMinor": 24620,
+            "reservedMinor": 0
+          },
+          {
+            "availableMinor": 25020,
+            "reservedMinor": 0
+          }
+        ]
+      },
+      "resultIdHash": "40e68ca32079c1d4f61d40d247991562c213b4b35491d673402ee2a069a1cd12"
+    }
+  ],
+  "restore": {
+    "archiveReconstructedTwice": true,
+    "ledgerAndProofTransportAuditPassed": true,
+    "oldDatabaseRetainedDuringAtomicCutover": true,
+    "oldProofArtifactsMathematicallyRechecked": 3,
+    "resumedCheckmateAndExactSettlementRetry": true
+  },
+  "sourceContracts": {
+    "engineVersion": "0.4.0-strict.2",
+    "schemaVersion": 3,
+    "rulesVersion": "skillbetting.chess.fide-2023.strict-proof-artifacts.v1",
+    "migration": "009_chess_proof_storage.sql",
+    "computerPlay": false,
+    "unresolvedPositionMayContinue": false
+  },
+  "cleanup": "Smoke script exited zero and removed only its owned project, synthetic database/TLS/backup volumes, private settings and test-only image tags. Native review fixtures and unrelated data were preserved.",
+  "remaining": [
+    "server-agent deployment with existing database/settings preserved",
+    "public HTTPS/readiness and independent browser acceptance",
+    "encrypted off-server backup destination configuration"
+  ]
+}

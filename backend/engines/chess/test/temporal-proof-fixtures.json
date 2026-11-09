@@ -1,0 +1,243 @@
+{
+  "scope": "Locally validated analysis diagrams; standard-start reachability is not established. Independent complete movement graphs omit counter/repetition endings and never expand after board stalemate or checkmate. Earlier v0.1.4 behavior is evidence of the baseline, not the v0.1.5 result.",
+  "dead": [
+    {
+      "id": "reported-finite-tempo-reserves",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/P1P2P1P/4K3 w - - 0 1",
+      "expectedGraphNodes": 383,
+      "expectedGraphEdges": 803,
+      "expectedStalemates": 232,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "playing"
+    },
+    {
+      "id": "finite-tempo-with-actionable-ep",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/P1P2P1P/4K3 w - f6 0 1",
+      "expectedGraphNodes": 384,
+      "expectedGraphEdges": 804,
+      "expectedStalemates": 233,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "playing"
+    },
+    {
+      "id": "finite-tempo-relocated-king",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/P1P2P1P/3K4 w - - 0 1",
+      "expectedGraphNodes": 405,
+      "expectedGraphEdges": 867,
+      "expectedStalemates": 250,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "playing"
+    },
+    {
+      "id": "finite-tempo-advanced-h-reserve",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/7P/P1P2P2/4K3 w - - 0 1",
+      "expectedGraphNodes": 318,
+      "expectedGraphEdges": 649,
+      "expectedStalemates": 189,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "playing"
+    },
+    {
+      "id": "finite-tempo-advanced-a-c-reserves",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/P1P5/5P1P/4K3 w - - 0 1",
+      "expectedGraphNodes": 261,
+      "expectedGraphEdges": 526,
+      "expectedStalemates": 152,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "playing"
+    },
+    {
+      "id": "finite-side-moves-first",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/P1P2P1P/4K3 b - - 0 1",
+      "expectedGraphNodes": 81,
+      "expectedGraphEdges": 127,
+      "expectedStalemates": 57,
+      "expectedPromotionEdges": 0,
+      "expectedTerminalPromotionEdges": 0,
+      "baselineAutomaticPhase": "ended"
+    },
+    {
+      "id": "last-promotion-with-finite-side-first",
+      "fen": "kb6/p1p5/P1P3P1/5p2/8/8/P1P2P1P/4K3 b - - 0 1",
+      "expectedGraphNodes": 84,
+      "expectedGraphEdges": 130,
+      "expectedStalemates": 60,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "ended"
+    },
+    {
+      "id": "promotion-only-as-terminal-move",
+      "fen": "kb6/p1p3P1/P1P5/8/8/5p2/P1P2P1P/4K3 w - - 0 3",
+      "expectedGraphNodes": 14,
+      "expectedGraphEdges": 13,
+      "expectedStalemates": 13,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "ended"
+    },
+    {
+      "id": "central-king-with-two-bishop-cage",
+      "fen": "1bkb4/p1p1p3/P1P1P3/6pP/8/8/P1P1P1P1/4K3 w - - 0 1",
+      "expectedGraphNodes": 404,
+      "expectedGraphEdges": 842,
+      "expectedStalemates": 249,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "playing"
+    },
+    {
+      "id": "two-separate-pawn-clocks",
+      "fen": "6bk/5p1p/5P1P/p1pP4/8/P1P5/8/4K3 w - - 0 1",
+      "expectedGraphNodes": 140,
+      "expectedGraphEdges": 318,
+      "expectedStalemates": 58,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "ended"
+    },
+    {
+      "id": "two-clocks-with-conservative-region-overlap",
+      "fen": "6bk/5p1p/5P1P/p2P2p1/8/P5P1/8/4K3 w - - 0 1",
+      "expectedGraphNodes": 139,
+      "expectedGraphEdges": 316,
+      "expectedStalemates": 57,
+      "expectedPromotionEdges": 4,
+      "expectedTerminalPromotionEdges": 4,
+      "baselineAutomaticPhase": "ended",
+      "expectedTemporalCertificate": false
+    }
+  ],
+  "closing": {
+    "id": "live-king-retreat-into-finite-tempo-draw",
+    "fen": "1b6/pkp5/P1P5/5pP1/8/8/P1P2P1P/4K3 b - - 0 1",
+    "move": "b7a8",
+    "target": "reported-finite-tempo-reserves",
+    "liveWitnessId": "king-capture-keeps-the-precursor-live"
+  },
+  "live": [
+    {
+      "id": "earlier-promotion-leaves-two-queen-moves",
+      "fen": "kb6/p1p3P1/P1P5/5p2/8/8/P1P2P1P/4K3 w - - 0 1",
+      "winner": "white",
+      "witness": ["g7g8q", "f5f4", "g8b3", "f4f3", "b3b7"]
+    },
+    {
+      "id": "extra-opponent-tempo-permits-promotion-mate",
+      "fen": "kb6/p1p5/P1P2pP1/8/8/8/P1P2P1P/4K3 w - - 0 1",
+      "winner": "white",
+      "witness": ["g6g7", "f6f5", "g7g8q", "f5f4", "g8b3", "f4f3", "b3b7"]
+    },
+    {
+      "id": "one-promoted-queen-move-releases-the-king",
+      "fen": "kb6/p1p5/P1P3P1/5p2/8/8/P1P2P1P/4K3 w - - 0 1",
+      "winner": "white",
+      "witness": [
+        "g6g7",
+        "f5f4",
+        "g7g8q",
+        "f4f3",
+        "g8b8",
+        "a8b8",
+        "h2h4",
+        "b8a8",
+        "h4h5",
+        "a8b8",
+        "h5h6",
+        "b8a8",
+        "h6h7",
+        "a8b8",
+        "h7h8q"
+      ]
+    },
+    {
+      "id": "en-passant-plus-extra-tempos-mates",
+      "fen": "kb6/p1p4p/P1P5/5pP1/8/8/P1P2P1P/4K3 w - f6 0 1",
+      "winner": "white",
+      "witness": [
+        "g5f6",
+        "h7h6",
+        "f6f7",
+        "h6h5",
+        "f7f8q",
+        "h5h4",
+        "f8b4",
+        "h4h3",
+        "b4b7"
+      ]
+    },
+    {
+      "id": "knight-sacrifice-gives-opponent-promotion-mate",
+      "fen": "kb6/p1p5/P1P5/5pP1/8/8/P1P1NP1P/4K3 w - - 0 1",
+      "winner": "black",
+      "witness": [
+        "e2g3",
+        "f5f4",
+        "e1f1",
+        "f4g3",
+        "f1g2",
+        "g3f2",
+        "g2h1",
+        "f2f1q"
+      ]
+    },
+    {
+      "id": "king-capture-keeps-the-precursor-live",
+      "fen": "1b6/pkp5/P1P5/5pP1/8/8/P1P2P1P/4K3 b - - 0 1",
+      "winner": "white",
+      "witness": [
+        "b7a6",
+        "a2a4",
+        "a6b6",
+        "h2h4",
+        "b6a6",
+        "h4h5",
+        "a6b6",
+        "h5h6",
+        "b6a6",
+        "h6h7",
+        "a6b6",
+        "h7h8q",
+        "b6a6",
+        "h8b2",
+        "a6a5",
+        "b2b5"
+      ]
+    },
+    {
+      "id": "finite-side-forward-pawn-move-delivers-mate",
+      "fen": "kb6/p1p5/P1P5/8/6pp/7P/6PK/6BR b - - 0 1",
+      "winner": "black",
+      "witness": ["g4g3"]
+    },
+    {
+      "id": "promotion-checkmate-precedes-stalemate",
+      "fen": "k7/p1P3P1/P1P5/8/8/5p2/P1P2P1P/4K3 w - - 0 3",
+      "winner": "white",
+      "witness": ["g7g8q"]
+    }
+  ],
+  "lastPromotion": {
+    "fen": "kb6/p1p3P1/P1P5/8/8/5p2/P1P2P1P/4K3 w - - 0 3",
+    "from": "g7",
+    "to": "g8",
+    "terminalReason": "stalemate"
+  },
+  "analysisBoardLineToPromotion": ["g5g6", "f5f4", "g6g7", "f4f3", "g7g8q"],
+  "promotionChoice": {
+    "fen": "k7/p1P3P1/P1P5/8/8/5p2/P1P2P1P/4K3 w - - 0 3",
+    "from": "g7",
+    "to": "g8",
+    "outcomes": {
+      "q": "checkmate",
+      "r": "checkmate",
+      "b": "stalemate",
+      "n": "stalemate"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+# Used only by smoke.sh with a unique disposable project and generated secrets.
+services:
+  edge:
+    ports: !override []
+    volumes:
+      - ./Caddyfile.smoke:/etc/caddy/Caddyfile:ro
+    networks:
+      application:
+        aliases: [skillbetting.test]

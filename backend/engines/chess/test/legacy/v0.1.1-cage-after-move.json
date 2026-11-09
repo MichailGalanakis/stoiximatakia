@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "engineVersion": "0.1.1",
+  "rulesVersion": "skillbetting.chess.fide-2023.v1",
+  "game": "chess",
+  "initial": {
+    "mode": "analysis",
+    "players": {
+      "white": "alice",
+      "black": "bob"
+    },
+    "fen": "6bk/8/8/8/p1p1p1p1/P1PpP1P1/P2P4/RN5K w - - 0 1",
+    "movesBeforeStart": {
+      "white": 0,
+      "black": 0
+    }
+  },
+  "revision": 1,
+  "fen": "6bk/8/8/8/p1p1p1p1/P1PpP1P1/P2P3K/RN6 b - - 1 1",
+  "turn": "black",
+  "ply": 1,
+  "movesByColor": {
+    "white": 1,
+    "black": 0
+  },
+  "positionHistory": [
+    "6bk/8/8/8/p1p1p1p1/P1PpP1P1/P2P4/RN5K w - -",
+    "6bk/8/8/8/p1p1p1p1/P1PpP1P1/P2P3K/RN6 b - -"
+  ],
+  "history": [
+    {
+      "kind": "player",
+      "playerId": "alice",
+      "action": {
+        "type": "move",
+        "from": "h1",
+        "to": "h2"
+      }
+    }
+  ],
+  "phase": "playing",
+  "drawOffer": null,
+  "forcedMove": null,
+  "pendingResignation": null,
+  "roundOutcome": null,
+  "matchOutcome": null
+}

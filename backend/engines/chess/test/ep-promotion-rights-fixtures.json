@@ -1,0 +1,20 @@
+{
+  "scope": "Locally validated analysis fixtures for exceptional-right interactions; standard-start reachability is not established. Expected moves are independently checked using chess.js by the companion audit script.",
+  "onePinnedEnPassant": {
+    "fen": "3r3k/8/8/3PpP2/8/8/8/3K4 w - e6 0 1",
+    "legal": "f5e6",
+    "illegal": "d5e6",
+    "captured": "e5"
+  },
+  "bothPinnedEnPassant": {
+    "fen": "7k/8/2b3b1/3PpP2/4K3/8/8/8 w - e6 0 1",
+    "illegal": ["d5e6", "f5e6"],
+    "quiet": "e4d3"
+  },
+  "promotionCapturesOriginalRook": {
+    "fen": "r3k2r/6P1/8/8/8/8/8/4K3 w kq - 99 50",
+    "capture": "g7h8",
+    "remainingCastle": "e8c8",
+    "rookArrival": "d8"
+  }
+}

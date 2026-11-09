@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "engineVersion": "0.1.6",
+  "rulesVersion": "skillbetting.chess.fide-2023.v1",
+  "game": "chess",
+  "initial": {
+    "mode": "analysis",
+    "players": {
+      "white": "alice",
+      "black": "bob"
+    },
+    "fen": "kb6/p1p5/P1P5/p7/8/7P/P1P1PPPN/RB2K1NR w KQ - 0 1",
+    "movesBeforeStart": {
+      "white": 0,
+      "black": 0
+    }
+  },
+  "revision": 1,
+  "fen": "kb6/p1p5/P1P5/p7/2P5/7P/P3PPPN/RB2K1NR b KQ c3 0 1",
+  "turn": "black",
+  "ply": 1,
+  "movesByColor": {
+    "white": 1,
+    "black": 0
+  },
+  "positionHistory": [
+    "kb6/p1p5/P1P5/p7/8/7P/P1P1PPPN/RB2K1NR w KQ -",
+    "kb6/p1p5/P1P5/p7/2P5/7P/P3PPPN/RB2K1NR b KQ -"
+  ],
+  "history": [
+    {
+      "kind": "player",
+      "playerId": "alice",
+      "action": {
+        "type": "move",
+        "from": "c2",
+        "to": "c4"
+      }
+    }
+  ],
+  "phase": "ended",
+  "drawOffer": null,
+  "forcedMove": null,
+  "pendingResignation": null,
+  "roundOutcome": {
+    "roundNumber": 1,
+    "kind": "draw",
+    "winner": null,
+    "winnerId": null,
+    "reason": "dead-position-proven",
+    "ply": 1,
+    "scores": [
+      {
+        "playerId": "alice",
+        "color": "white",
+        "points": 0.5
+      },
+      {
+        "playerId": "bob",
+        "color": "black",
+        "points": 0.5
+      }
+    ]
+  },
+  "matchOutcome": {
+    "kind": "draw",
+    "winner": null,
+    "winnerId": null,
+    "reason": "single-game-complete",
+    "gameReason": "dead-position-proven",
+    "scores": [
+      {
+        "playerId": "alice",
+        "color": "white",
+        "points": 0.5
+      },
+      {
+        "playerId": "bob",
+        "color": "black",
+        "points": 0.5
+      }
+    ]
+  }
+}
