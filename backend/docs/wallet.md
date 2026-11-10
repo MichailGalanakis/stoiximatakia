@@ -198,8 +198,67 @@ reviewed legally: some regimes require players to withdraw their own balance fre
 ## Eligibility
 
 Real-money operations require a `registered` account with a verified email or
-phone. KYC, age and jurisdiction checks attach at `requireEligible` in
-`wallet.store.ts` once a provider and legal basis exist.
+phone, in an approved jurisdiction (below). KYC and age checks attach at
+`requireEligible` in `wallet.store.ts` once a provider and legal basis exist.
+
+## Jurisdictions and payment methods
+
+Migration 016 adds the specification's payment methods registry.
+
+- **Jurisdictions** (`jurisdictions`): a country is either approved for the activity
+  or not. Every real-money action (deposit, withdrawal, euro seat, tournament ticket,
+  match against the platform) requires the player's country to be approved
+  (`jurisdiction_unavailable` otherwise). Withdrawing a country's approval
+  deactivates all its methods at once; re-approving does not reactivate them.
+- **Player country**: a country set by finance (`PUT /wallet/v1/admin/players/:id/jurisdiction`,
+  later by KYC) wins; until then it is the country of the registered phone number.
+  The free-text profile country is never used. This is a stop-gap until KYC.
+- **Methods** (`payment_methods`): method × provider × country × currency ×
+  direction, each active or not; the database refuses to activate a method in an
+  unapproved country. Deposits name a method (`card` by default); withdrawals use
+  the active withdrawal method of the provider last used to deposit.
+- Migration 016 seeds `GR` as approved with sandbox `card` and RF methods for
+  development. **That approval is a placeholder: review it before real money.**
+
+Player: `GET /wallet/v1/payment-methods` → `{country, methods}` (only configured
+providers). Admin: `GET|PUT /wallet/v1/admin/jurisdictions/:country {approved, note}`
+(admin role), `GET|PUT /wallet/v1/admin/payment-methods {method, provider, country,
+direction, active}` (admin role), player country (finance). All audited.
+
+## RF bank deposits
+
+Enabled by `WALLET_RF_IBAN` (and `WALLET_RF_BENEFICIARY`). `POST /wallet/v1/deposits
+{…, method: "rf_bank"}` returns `instructions {rfCode, iban, beneficiary}` instead
+of a redirect. Each deposit gets its own ISO 11649 RF code (`RF` + check digits +
+reference), so the bank's interbank collection (e.g. DIAS) identifies it.
+
+Finance imports bank statement lines with `POST /wallet/v1/admin/bank-receipts
+{lines: [{bankReference, rfCode, amountMinor, paidAt}]}`. A line credits its deposit
+only if the RF code is valid and known, the deposit is still pending and the amount
+matches exactly; it then goes through the same once-only crediting as a provider
+event. Everything else is stored in `bank_receipts` as `unmatched` with a reason
+(`unknown_reference`, `amount_mismatch`, `deposit_final`, `invalid_rf_code`) for
+finance to resolve; a repeated bank reference is reported as `duplicate`.
+Withdrawals by bank transfer are approved as usual and then confirmed from the
+statement: `POST /wallet/v1/admin/withdrawals/:id/confirm-payout {outcome:
+paid|failed, bankReference}`. Fetching statements automatically needs a bank API
+agreement.
+
+## Wallet screen figures
+
+`GET /wallet/v1/balance` now covers every figure of the specification's wallet
+screen: `availableMinor`, `reservedMinor` (euro table seats), `inTournamentsMinor`
+(active tournament tickets), `inHouseMatchesMinor` (stakes in active matches against
+the platform), `pendingWithdrawalMinor`, `totalMinor` (all of these),
+`withdrawableMinor`, and `monthWinningsMinor`: gross prizes credited this calendar
+month (Athens time) from euro tables, platform matches and tournaments.
+
+## Notifications
+
+Buying a tournament ticket queues a confirmation in `notification_outbox` in the same
+transaction. A background job delivers it by email through the existing Resend
+account (`RESEND_API_KEY`), only to registered accounts with a verified email;
+others are marked `skipped`, never sent to. Failed sends retry up to five times.
 
 ## API
 
@@ -207,9 +266,10 @@ Player (session cookie; writes need the app `Origin` and `X-SkillBetting-Client:
 
 | Method   | Path                                | Purpose                                            |
 | -------- | ----------------------------------- | -------------------------------------------------- |
-| GET      | `/wallet/v1/balance`                | balances, total and current `withdrawableMinor`    |
+| GET      | `/wallet/v1/balance`                | all wallet screen figures (see above)              |
+| GET      | `/wallet/v1/payment-methods`        | methods available in the player's country          |
 | GET      | `/wallet/v1/transactions`           | latest 100 ledger entries on the player's accounts |
-| GET/POST | `/wallet/v1/deposits`               | list / start a deposit                             |
+| GET/POST | `/wallet/v1/deposits`               | list / start a deposit (`method` optional)         |
 | GET/POST | `/wallet/v1/withdrawals`            | list / request a withdrawal                        |
 | POST     | `/wallet/v1/withdrawals/:id/cancel` | cancel a `requested` withdrawal                    |
 
@@ -266,8 +326,11 @@ the provider position from deposits − paid withdrawals − lost chargebacks. I
 checks the ledger balances, every balance matches its history, finished tables and
 tournaments have empty pools, and settled house matches are empty. Each run is
 stored (`ok` or `mismatch` with the difference); `GET reconciliations` lists them.
-Daily scheduling and fetching the statement from a real provider come with the
-provider integration.
+A background job also runs it unattended every `WALLET_RECONCILE_INTERVAL_HOURS`
+(24) for each provider, as actor `system`, without a statement (`reportedHeldMinor`
+null, integrity checks only). An advisory lock and a 20-hour window stop several app
+instances from duplicating it. Fetching the statement from a real provider comes
+with the provider integration.
 
 ## Sandbox provider
 
@@ -302,7 +365,9 @@ adapter should move the provider call outside it before going live.
 `WALLET_SANDBOX_SECRET`, `WALLET_ADMIN_TOKEN`, `WALLET_MIN_DEPOSIT_MINOR` (500),
 `WALLET_MAX_DEPOSIT_MINOR` (100000), `WALLET_MIN_WITHDRAWAL_MINOR` (1000),
 `WALLET_WITHDRAWALS_PER_DAY` (3), `WALLET_WITHDRAWAL_FLOOR_MINOR` (10000),
-`WALLET_WITHDRAWAL_SHARE_BPS` (8000 = 80%). The deployment compose file does not pass these
+`WALLET_WITHDRAWAL_SHARE_BPS` (8000 = 80%), `WALLET_RF_IBAN`, `WALLET_RF_BENEFICIARY`,
+`WALLET_RECONCILE_INTERVAL_HOURS` (24; `0` disables), `WALLET_NOTIFY_INTERVAL_SECONDS`
+(60; needs `RESEND_API_KEY`). The deployment compose file does not pass these
 yet, so the wallet stays disabled on `dev.stoiximatakia.gr` until enabled on purpose.
 
 ## Next steps (specification order)
