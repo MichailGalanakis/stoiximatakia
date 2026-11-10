@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { requireJurisdiction } from './jurisdiction';
 import { WalletError } from './wallet-error';
 import { postWallet, userAccount } from './wallet-ledger';
 
@@ -51,6 +52,7 @@ export async function startHouseMatch(
   c: PoolClient,
   input: { matchId: string; userId: string; offerId: string; gameId: string },
 ): Promise<HouseMatch> {
+  await requireJurisdiction(c, input.userId);
   const offer = await c.query<{ stake: number; prize: number }>(
     'SELECT stake_minor::float8 AS stake,prize_minor::float8 AS prize FROM house_offers WHERE id=$1 AND active FOR SHARE',
     [input.offerId],

@@ -16,6 +16,8 @@ import {
 } from './game-runtime';
 import { PlatformError } from './platform-error';
 import { PLATFORM_SETTINGS, type PlatformSettings } from './platform-settings';
+import { requireJurisdiction } from '../wallet/jurisdiction';
+import { WalletError } from '../wallet/wallet-error';
 import type { CreateTableDto } from './table.dto';
 import {
   feeAccount,
@@ -314,7 +316,8 @@ export class PlatformStore implements OnModuleDestroy {
         error.constraint === 'game_tables_code_hash_key'
       )
         throw new PlatformError('private_code_unavailable', 409);
-      if (error instanceof PlatformError) throw error;
+      if (error instanceof PlatformError || error instanceof WalletError)
+        throw error;
       throw new PlatformError('platform_unavailable', 503);
     } finally {
       client.release();
@@ -716,6 +719,7 @@ export class PlatformStore implements OnModuleDestroy {
       [u],
     );
     if (!rows.length) throw new PlatformError('account_not_eligible', 403);
+    await requireJurisdiction(c, u);
   }
   private async locked(
     c: PoolClient,

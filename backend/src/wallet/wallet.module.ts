@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RegistrationModule } from '../registration/registration.module';
 import { WalletAdminController, WalletController } from './wallet.controller';
+import { WalletJobs } from './wallet-jobs';
 import { WALLET_SETTINGS, walletSettings } from './wallet-settings';
 import { WalletStore } from './wallet.store';
 
@@ -9,6 +10,7 @@ import { WalletStore } from './wallet.store';
   controllers: [WalletController, WalletAdminController],
   providers: [
     WalletStore,
+    WalletJobs,
     { provide: WALLET_SETTINGS, useFactory: () => walletSettings() },
   ],
   exports: [WalletStore],

@@ -30,3 +30,18 @@ void test('wallet settings reject an invalid withdrawal share', () => {
     10_000,
   );
 });
+
+void test('RF bank deposits and background jobs are configured from the environment', () => {
+  const defaults = walletSettings({});
+  assert.equal(defaults.rfIban, undefined);
+  assert.equal(defaults.reconcileIntervalHours, 24);
+  assert.equal(defaults.notifyIntervalSeconds, 60);
+  const configured = walletSettings({
+    WALLET_RF_IBAN: 'gr16 0110 1250 0000 0001 2300 695',
+    WALLET_RECONCILE_INTERVAL_HOURS: '0',
+  });
+  assert.equal(configured.rfIban, 'GR1601101250000000012300695');
+  assert.equal(configured.rfBeneficiary, 'SkillBetting');
+  assert.equal(configured.reconcileIntervalHours, 0);
+  assert.throws(() => walletSettings({ WALLET_RF_IBAN: 'not-an-iban' }));
+});

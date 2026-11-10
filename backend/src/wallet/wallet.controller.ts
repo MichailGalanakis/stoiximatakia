@@ -6,6 +6,7 @@ import {
   Inject,
   Param,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -23,7 +24,14 @@ import {
   AdminNameDto,
   AmountOperationDto,
   AuditQueryDto,
+  BankReceiptsDto,
   CapitalDto,
+  ConfirmPayoutDto,
+  CountryDto,
+  DepositDto,
+  JurisdictionDto,
+  PaymentMethodDto,
+  UserIdDto,
   CorrectionDto,
   CorrectionIdDto,
   CreateAdminDto,
@@ -93,9 +101,16 @@ export class WalletController {
   ) {
     return this.store.deposits(this.session(req, reply));
   }
+  @Get('payment-methods')
+  paymentMethods(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    return this.store.paymentMethods(this.session(req, reply));
+  }
   @Post('deposits')
   deposit(
-    @Body() input: AmountOperationDto,
+    @Body() input: DepositDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
@@ -103,6 +118,7 @@ export class WalletController {
       this.session(req, reply, true),
       input.operationId,
       input.amountMinor,
+      input.method,
     );
   }
   @Get('withdrawals')
@@ -325,6 +341,88 @@ export class WalletAdminController {
       input.outcome,
       input.note,
     );
+  }
+
+  @Post('withdrawals/:withdrawalId/confirm-payout')
+  @HttpCode(200)
+  async confirmPayout(
+    @Param() params: WithdrawalIdDto,
+    @Body() input: ConfirmPayoutDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.confirmManualPayout(
+      actor,
+      params.withdrawalId,
+      input.outcome,
+      input.bankReference,
+    );
+  }
+  @Post('bank-receipts')
+  @HttpCode(200)
+  async bankReceipts(
+    @Body() input: BankReceiptsDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.importBankReceipts(actor, input.lines);
+  }
+
+  @Get('jurisdictions')
+  async jurisdictions(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    await this.admin(req, reply, 'viewer');
+    return this.store.jurisdictions();
+  }
+  @Put('jurisdictions/:country')
+  async setJurisdiction(
+    @Param() params: CountryDto,
+    @Body() input: JurisdictionDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'admin');
+    return this.store.setJurisdiction(
+      actor,
+      params.country,
+      input.approved,
+      input.note,
+    );
+  }
+  @Put('players/:userId/jurisdiction')
+  async setPlayerJurisdiction(
+    @Param() params: UserIdDto,
+    @Body() input: CountryDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'finance');
+    return this.store.setPlayerJurisdiction(
+      actor,
+      params.userId,
+      input.country,
+    );
+  }
+  @Get('payment-methods')
+  async adminPaymentMethods(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    await this.admin(req, reply, 'viewer');
+    return this.store.adminPaymentMethods();
+  }
+  @Put('payment-methods')
+  async setPaymentMethod(
+    @Body() input: PaymentMethodDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const actor = await this.admin(req, reply, 'admin');
+    return this.store.setPaymentMethod(actor, input);
   }
 
   @Get('reconciliations')

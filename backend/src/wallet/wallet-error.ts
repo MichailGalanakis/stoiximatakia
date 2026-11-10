@@ -40,7 +40,10 @@ export type WalletCode =
   | 'dispute_exists'
   | 'dispute_resolved'
   | 'account_restricted'
-  | 'user_not_found';
+  | 'user_not_found'
+  | 'jurisdiction_unavailable'
+  | 'payment_method_unavailable'
+  | 'invalid_jurisdiction';
 
 export class WalletError extends HttpException {
   constructor(

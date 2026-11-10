@@ -7,8 +7,15 @@ import {
   type RegistrationSettings,
 } from '../registration/registration-settings';
 import {
+  activeMethod,
+  playerCountry,
+  requireJurisdiction,
+} from './jurisdiction';
+import {
+  BankRfProvider,
   InvalidProviderEvent,
   SandboxPaymentProvider,
+  validRfCode,
   type PaymentProvider,
   type ProviderEvent,
 } from './payment-provider';
@@ -49,6 +56,27 @@ import {
 } from './wallet-settings';
 
 const SESSION_PATTERN = /^[a-f0-9]{64}$/;
+const SYSTEM_ACTOR: AdminActor = { name: 'system', role: 'admin' };
+const euros = (minor: unknown) =>
+  (Number(minor) / 100).toLocaleString('el-GR', {
+    style: 'currency',
+    currency: 'EUR',
+  });
+
+function notificationText(kind: string, p: Record<string, unknown>) {
+  if (kind !== 'tournament_ticket') throw new Error('Unknown notification');
+  const starts = new Date(String(p.startsAt)).toLocaleString('el-GR', {
+    timeZone: 'Europe/Athens',
+  });
+  return {
+    subject: `Επιβεβαίωση εισιτηρίου: ${String(p.name)}`,
+    text:
+      `Το εισιτήριό σου για το τουρνουά «${String(p.name)}» επιβεβαιώθηκε.\n` +
+      `Κωδικός εισιτηρίου: ${String(p.ticketId)}\n` +
+      `Έναρξη: ${starts}\n` +
+      `Αμοιβή διοργάνωσης: ${euros(p.feeMinor)} · Συνεισφορά επάθλου: ${euros(p.contributionMinor)}`,
+  };
+}
 const fingerprintOf = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
@@ -65,6 +93,7 @@ interface DepositRow {
   amount_minor: number;
   currency: string;
   status: 'pending' | 'succeeded' | 'failed';
+  method: string;
   created_at: Date;
 }
 interface WithdrawalRow {
@@ -78,17 +107,19 @@ interface WithdrawalRow {
   provider_reference: string | null;
   reviewed_by: string | null;
   review_note: string | null;
+  method: string;
   created_at: Date;
   updated_at: Date;
 }
 const DEPOSIT_COLUMNS =
-  'id,user_id,provider,amount_minor::float8 AS amount_minor,currency,status,created_at';
+  'id,user_id,provider,amount_minor::float8 AS amount_minor,currency,status,method,created_at';
 const WITHDRAWAL_COLUMNS =
-  'id,user_id,provider,amount_minor::float8 AS amount_minor,currency,status,provider_reference,reviewed_by,review_note,created_at,updated_at';
+  'id,user_id,provider,amount_minor::float8 AS amount_minor,currency,status,provider_reference,reviewed_by,review_note,method,created_at,updated_at';
 
 const depositView = (d: DepositRow) => ({
   id: d.id,
   provider: d.provider,
+  method: d.method,
   amountMinor: d.amount_minor,
   currency: d.currency,
   status: d.status,
@@ -97,6 +128,7 @@ const depositView = (d: DepositRow) => ({
 const withdrawalView = (w: WithdrawalRow) => ({
   id: w.id,
   provider: w.provider,
+  method: w.method,
   amountMinor: w.amount_minor,
   currency: w.currency,
   status: w.status,
@@ -132,9 +164,19 @@ export class WalletStore implements OnModuleDestroy {
           registration.appOrigin,
         ),
       );
+    if (settings.rfIban)
+      this.registerProvider(
+        new BankRfProvider(
+          settings.rfIban,
+          settings.rfBeneficiary ?? 'SkillBetting',
+        ),
+      );
   }
   registerProvider(provider: PaymentProvider): void {
     this.providers.set(provider.id, provider);
+  }
+  hasProviders(): boolean {
+    return this.providers.size > 0;
   }
   async onModuleDestroy(): Promise<void> {
     await this.pool?.end();
@@ -227,13 +269,48 @@ export class WalletStore implements OnModuleDestroy {
     const availableMinor = of('available');
     const reservedMinor = of('reserved');
     const pendingWithdrawalMinor = of('withdrawal_pending');
+    // Tournament tickets and house-match stakes leave the player's accounts, so
+    // they are added back here to show the full picture of the player's money.
+    const { rows: extra } = await c.query<{
+      tournaments: number;
+      houseMatches: number;
+      monthWinnings: number;
+    }>(
+      `WITH month AS (SELECT date_trunc('month', now() AT TIME ZONE 'Europe/Athens') AT TIME ZONE 'Europe/Athens' AS start)
+       SELECT
+         (SELECT coalesce(sum(fee_minor+contribution_minor),0)::float8 FROM tournament_tickets
+            WHERE user_id=$1 AND state='active') AS tournaments,
+         (SELECT coalesce(sum(stake_minor),0)::float8 FROM house_matches
+            WHERE user_id=$1 AND status='active') AS "houseMatches",
+         ((SELECT coalesce(sum(a.amount_minor),0) FROM match_allocations a
+             JOIN match_results r ON r.id=a.result_id JOIN game_tables t ON t.id=a.table_id
+             WHERE a.user_id=$1 AND r.kind='win' AND t.currency='EUR' AND a.amount_minor>0
+               AND r.created_at>=(SELECT start FROM month))
+          + (SELECT coalesce(sum(prize_minor),0) FROM house_matches
+             WHERE user_id=$1 AND status='won' AND settled_at>=(SELECT start FROM month))
+          + (SELECT coalesce(sum(r.payout_minor),0) FROM tournament_results r
+             JOIN tournaments t ON t.id=r.tournament_id
+             WHERE r.user_id=$1 AND t.finished_at>=(SELECT start FROM month)))::float8 AS "monthWinnings"`,
+      [userId],
+    );
+    const inTournamentsMinor = extra[0]!.tournaments;
+    const inHouseMatchesMinor = extra[0]!.houseMatches;
     return {
       currency: 'EUR' as const,
       availableMinor,
       reservedMinor,
+      inTournamentsMinor,
+      inHouseMatchesMinor,
       pendingWithdrawalMinor,
-      totalMinor: availableMinor + reservedMinor + pendingWithdrawalMinor,
+      totalMinor:
+        availableMinor +
+        reservedMinor +
+        inTournamentsMinor +
+        inHouseMatchesMinor +
+        pendingWithdrawalMinor,
       withdrawableMinor: maxWithdrawableMinor(availableMinor, this.settings),
+      // Gross prizes credited this calendar month (Athens time).
+      monthWinningsMinor: extra[0]!.monthWinnings,
     };
   }
 
@@ -296,19 +373,39 @@ export class WalletStore implements OnModuleDestroy {
     });
   }
 
-  private defaultProvider(): PaymentProvider {
-    const provider = this.providers.values().next().value;
-    if (!provider) throw new WalletError('wallet_unavailable', 503);
-    return provider;
+  /** Methods the player may use now: active, approved for their country, configured. */
+  paymentMethods(hash: string) {
+    return this.session(hash, async (c, actor) => {
+      const country = await playerCountry(c, actor.id);
+      const { rows } = await c.query<{
+        method: string;
+        provider: string;
+        direction: string;
+      }>(
+        `SELECT m.method,m.provider,m.direction FROM payment_methods m
+         JOIN jurisdictions j ON j.country=m.country AND j.approved
+         WHERE m.country=$1 AND m.active ORDER BY m.direction,m.method,m.provider`,
+        [country],
+      );
+      return {
+        country,
+        methods: rows.filter((m) => this.providers.has(m.provider)),
+      };
+    });
   }
 
-  createDeposit(hash: string, operationId: string, amountMinor: number) {
+  createDeposit(
+    hash: string,
+    operationId: string,
+    amountMinor: number,
+    method = 'card',
+  ) {
     return this.session(hash, (c, actor) =>
       this.operation(
         c,
         actor.id,
         operationId,
-        { type: 'deposit', amountMinor },
+        { type: 'deposit', amountMinor, method },
         async () => {
           this.requireEligible(actor);
           if (
@@ -316,7 +413,15 @@ export class WalletStore implements OnModuleDestroy {
             amountMinor > this.settings.maxDepositMinor
           )
             throw new WalletError('invalid_amount', 400);
-          const provider = this.defaultProvider();
+          const country = await requireJurisdiction(c, actor.id);
+          const route = await activeMethod(c, {
+            country,
+            direction: 'deposit',
+            method,
+          });
+          const provider = route && this.providers.get(route.provider);
+          if (!provider)
+            throw new WalletError('payment_method_unavailable', 409);
           const id = randomUUID();
           const session = await provider.createDeposit({
             depositId: id,
@@ -324,13 +429,25 @@ export class WalletStore implements OnModuleDestroy {
             currency: 'EUR',
           });
           const { rows } = await c.query<DepositRow>(
-            `INSERT INTO deposits(id,user_id,provider,amount_minor,provider_reference)
-             VALUES($1,$2,$3,$4,$5) RETURNING ${DEPOSIT_COLUMNS}`,
-            [id, actor.id, provider.id, amountMinor, session.providerReference],
+            `INSERT INTO deposits(id,user_id,provider,amount_minor,provider_reference,method)
+             VALUES($1,$2,$3,$4,$5,$6) RETURNING ${DEPOSIT_COLUMNS}`,
+            [
+              id,
+              actor.id,
+              provider.id,
+              amountMinor,
+              session.providerReference,
+              method,
+            ],
           );
           return {
             deposit: depositView(rows[0]!),
-            redirectUrl: session.redirectUrl,
+            ...(session.redirectUrl
+              ? { redirectUrl: session.redirectUrl }
+              : {}),
+            ...(session.instructions
+              ? { instructions: session.instructions }
+              : {}),
           };
         },
       ),
@@ -362,7 +479,8 @@ export class WalletStore implements OnModuleDestroy {
           );
           if (disputed.rowCount)
             throw new WalletError('account_restricted', 403);
-          // Pay out through the method last used to deposit.
+          const country = await requireJurisdiction(c, actor.id);
+          // Pay out through the provider last used to deposit.
           const source = await c.query<{ provider: string }>(
             "SELECT provider FROM deposits WHERE user_id=$1 AND status='succeeded' ORDER BY created_at DESC,id LIMIT 1",
             [actor.id],
@@ -370,6 +488,12 @@ export class WalletStore implements OnModuleDestroy {
           const providerId = source.rows[0]?.provider;
           if (!providerId || !this.providers.has(providerId))
             throw new WalletError('account_not_eligible', 403);
+          const route = await activeMethod(c, {
+            country,
+            direction: 'withdrawal',
+            provider: providerId,
+          });
+          if (!route) throw new WalletError('payment_method_unavailable', 409);
           const available = await c.query<{ amount: number }>(
             'SELECT balance_minor::float8 AS amount FROM wallet_accounts WHERE key=$1 FOR UPDATE',
             [userAccount('available', actor.id)],
@@ -397,9 +521,9 @@ export class WalletStore implements OnModuleDestroy {
             ],
           });
           const { rows } = await c.query<WithdrawalRow>(
-            `INSERT INTO withdrawal_requests(id,user_id,provider,amount_minor,hold_transaction_id)
-             VALUES($1,$2,$3,$4,$5) RETURNING ${WITHDRAWAL_COLUMNS}`,
-            [id, actor.id, providerId, amountMinor, hold],
+            `INSERT INTO withdrawal_requests(id,user_id,provider,amount_minor,hold_transaction_id,method)
+             VALUES($1,$2,$3,$4,$5,$6) RETURNING ${WITHDRAWAL_COLUMNS}`,
+            [id, actor.id, providerId, amountMinor, hold, route.method],
           );
           return {
             withdrawal: withdrawalView(rows[0]!),
@@ -920,5 +1044,310 @@ export class WalletStore implements OnModuleDestroy {
   }
   reconciliations() {
     return this.transaction((c) => listReconciliations(c));
+  }
+
+  /**
+   * Matches imported bank statement lines to RF deposits. A matching line credits
+   * the deposit exactly once; anything else is kept as unmatched for finance.
+   */
+  importBankReceipts(
+    actor: AdminActor,
+    lines: readonly {
+      bankReference: string;
+      rfCode: string;
+      amountMinor: number;
+      paidAt: string;
+    }[],
+  ) {
+    return this.transaction(async (c) => {
+      const results: {
+        bankReference: string;
+        status: string;
+        reason?: string;
+      }[] = [];
+      for (const line of lines) {
+        const known = await c.query(
+          'SELECT 1 FROM bank_receipts WHERE bank_reference=$1',
+          [line.bankReference],
+        );
+        if (known.rowCount) {
+          results.push({
+            bankReference: line.bankReference,
+            status: 'duplicate',
+          });
+          continue;
+        }
+        const deposit = await c.query<DepositRow>(
+          `SELECT ${DEPOSIT_COLUMNS} FROM deposits WHERE provider='bank_rf' AND provider_reference=$1 FOR UPDATE`,
+          [line.rfCode],
+        );
+        const d = deposit.rows[0];
+        let reason: string | undefined;
+        if (!validRfCode(line.rfCode)) reason = 'invalid_rf_code';
+        else if (!d) reason = 'unknown_reference';
+        else if (d.status !== 'pending') reason = 'deposit_final';
+        else if (d.amount_minor !== line.amountMinor)
+          reason = 'amount_mismatch';
+        if (!reason && d) {
+          const event: ProviderEvent = {
+            id: `bank:${line.bankReference}`,
+            type: 'deposit.succeeded',
+            paymentId: d.id,
+            providerReference: line.rfCode,
+            amountMinor: line.amountMinor,
+            currency: 'EUR',
+          };
+          await c.query(
+            'INSERT INTO provider_events(provider,event_id,event_type,payload) VALUES($1,$2,$3,$4)',
+            ['bank_rf', event.id, event.type, JSON.stringify(event)],
+          );
+          await this.applyDepositEvent(c, 'bank_rf', event);
+        }
+        await c.query(
+          `INSERT INTO bank_receipts(bank_reference,rf_code,amount_minor,paid_at,status,reason,deposit_id,imported_by)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            line.bankReference,
+            line.rfCode,
+            line.amountMinor,
+            line.paidAt,
+            reason ? 'unmatched' : 'matched',
+            reason ?? null,
+            reason ? null : d!.id,
+            actor.name,
+          ],
+        );
+        results.push({
+          bankReference: line.bankReference,
+          status: reason ? 'unmatched' : 'matched',
+          ...(reason ? { reason } : {}),
+        });
+      }
+      await audit(c, actor, 'bank_receipts.import', null, {
+        lines: lines.length,
+        matched: results.filter((r) => r.status === 'matched').length,
+      });
+      return { results };
+    });
+  }
+
+  /** Finance confirms a bank-transfer payout from the bank statement. */
+  confirmManualPayout(
+    actor: AdminActor,
+    withdrawalId: string,
+    outcome: 'paid' | 'failed',
+    bankReference: string,
+  ) {
+    return this.transaction(async (c) => {
+      const w = await this.lockWithdrawal(c, withdrawalId);
+      if (!this.providers.get(w.provider)?.manualPayouts)
+        throw new WalletError('withdrawal_state_conflict', 409);
+      if (w.status !== 'processing')
+        throw new WalletError('withdrawal_state_conflict', 409);
+      const event: ProviderEvent = {
+        id: `manual:${bankReference}`,
+        type: outcome === 'paid' ? 'payout.succeeded' : 'payout.failed',
+        paymentId: w.id,
+        providerReference: w.provider_reference!,
+        amountMinor: w.amount_minor,
+        currency: w.currency,
+      };
+      await c.query(
+        'INSERT INTO provider_events(provider,event_id,event_type,payload) VALUES($1,$2,$3,$4)',
+        [w.provider, event.id, event.type, JSON.stringify(event)],
+      );
+      await this.applyPayoutEvent(c, w.provider, event);
+      await audit(c, actor, `withdrawal.${outcome}`, w.id, {
+        bankReference,
+        amountMinor: w.amount_minor,
+      });
+      const { rows } = await c.query<WithdrawalRow>(
+        `SELECT ${WITHDRAWAL_COLUMNS} FROM withdrawal_requests WHERE id=$1`,
+        [w.id],
+      );
+      return { withdrawal: withdrawalView(rows[0]!) };
+    });
+  }
+
+  jurisdictions() {
+    return this.transaction(async (c) => {
+      const { rows } = await c.query(
+        'SELECT country,approved,note,updated_by AS "updatedBy",updated_at AS "updatedAt" FROM jurisdictions ORDER BY country',
+      );
+      return { jurisdictions: rows };
+    });
+  }
+  /** Approval is a legal decision; withdrawing it deactivates the country's methods. */
+  setJurisdiction(
+    actor: AdminActor,
+    country: string,
+    approved: boolean,
+    note: string,
+  ) {
+    return this.transaction(async (c) => {
+      await c.query(
+        `INSERT INTO jurisdictions(country,approved,note,updated_by) VALUES($1,$2,$3,$4)
+         ON CONFLICT (country) DO UPDATE SET approved=$2,note=$3,updated_by=$4,updated_at=now()`,
+        [country, approved, note, actor.name],
+      );
+      await audit(c, actor, 'jurisdiction.set', country, { approved, note });
+      return { jurisdiction: { country, approved, note } };
+    });
+  }
+  setPlayerJurisdiction(actor: AdminActor, userId: string, country: string) {
+    return this.transaction(async (c) => {
+      const user = await c.query('SELECT 1 FROM users WHERE id=$1', [userId]);
+      if (!user.rowCount) throw new WalletError('user_not_found', 404);
+      await c.query(
+        `INSERT INTO player_jurisdictions(user_id,country,source,set_by) VALUES($1,$2,'admin',$3)
+         ON CONFLICT (user_id) DO UPDATE SET country=$2,source='admin',set_by=$3,updated_at=now()`,
+        [userId, country, actor.name],
+      );
+      await audit(c, actor, 'player_jurisdiction.set', userId, { country });
+      return { userId, country };
+    });
+  }
+  adminPaymentMethods() {
+    return this.transaction(async (c) => {
+      const { rows } = await c.query(
+        `SELECT method,provider,country,currency,direction,active,updated_by AS "updatedBy",updated_at AS "updatedAt"
+         FROM payment_methods ORDER BY country,direction,method,provider`,
+      );
+      return { methods: rows };
+    });
+  }
+  setPaymentMethod(
+    actor: AdminActor,
+    input: {
+      method: string;
+      provider: string;
+      country: string;
+      direction: 'deposit' | 'withdrawal';
+      active: boolean;
+    },
+  ) {
+    return this.transaction(async (c) => {
+      const approved = await c.query<{ approved: boolean }>(
+        'SELECT approved FROM jurisdictions WHERE country=$1',
+        [input.country],
+      );
+      if (!approved.rows[0] || (input.active && !approved.rows[0].approved))
+        throw new WalletError('jurisdiction_unavailable', 409);
+      await c.query(
+        `INSERT INTO payment_methods(method,provider,country,direction,active,updated_by) VALUES($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (method,provider,country,currency,direction) DO UPDATE SET active=$5,updated_by=$6,updated_at=now()`,
+        [
+          input.method,
+          input.provider,
+          input.country,
+          input.direction,
+          input.active,
+          actor.name,
+        ],
+      );
+      await audit(
+        c,
+        actor,
+        'payment_method.set',
+        `${input.method}/${input.provider}/${input.country}/${input.direction}`,
+        { active: input.active },
+      );
+      return { method: { ...input, currency: 'EUR' } };
+    });
+  }
+
+  /**
+   * Delivers pending notifications to verified emails only; placeholder or
+   * unverified contacts are skipped, never sent to.
+   */
+  dispatchNotifications(
+    send: (message: {
+      id: string;
+      to: string;
+      subject: string;
+      text: string;
+    }) => Promise<void>,
+    limit = 20,
+  ) {
+    return this.transaction(async (c) => {
+      const { rows } = await c.query<{
+        id: string;
+        kind: string;
+        payload: Record<string, unknown>;
+        attempts: number;
+        email: string;
+        email_verified: boolean;
+        account_kind: string;
+      }>(
+        `SELECT n.id,n.kind,n.payload,n.attempts,u.email,u.email_verified,u.account_kind
+         FROM notification_outbox n JOIN users u ON u.id=n.user_id
+         WHERE n.status='pending' ORDER BY n.created_at,n.id LIMIT $1 FOR UPDATE OF n SKIP LOCKED`,
+        [limit],
+      );
+      const counts = { sent: 0, skipped: 0, failed: 0 };
+      for (const n of rows) {
+        if (n.account_kind !== 'registered' || !n.email_verified) {
+          await c.query(
+            "UPDATE notification_outbox SET status='skipped' WHERE id=$1",
+            [n.id],
+          );
+          counts.skipped++;
+          continue;
+        }
+        try {
+          await send({
+            id: n.id,
+            to: n.email,
+            ...notificationText(n.kind, n.payload),
+          });
+          await c.query(
+            "UPDATE notification_outbox SET status='sent',attempts=attempts+1,sent_at=now() WHERE id=$1",
+            [n.id],
+          );
+          counts.sent++;
+        } catch {
+          await c.query(
+            `UPDATE notification_outbox SET attempts=attempts+1,last_error='delivery_failed',
+             status=CASE WHEN attempts+1>=5 THEN 'failed' ELSE 'pending' END WHERE id=$1`,
+            [n.id],
+          );
+          counts.failed++;
+        }
+      }
+      return counts;
+    });
+  }
+
+  /**
+   * Unattended daily integrity run per provider. Uses an advisory lock and skips
+   * providers checked recently, so several app instances do not duplicate it.
+   */
+  runScheduledReconciliation(minHoursBetween = 20) {
+    return this.transaction(async (c) => {
+      const locked = await c.query<{ ok: boolean }>(
+        'SELECT pg_try_advisory_xact_lock(824613092) AS ok',
+      );
+      if (!locked.rows[0]!.ok) return { runs: [] };
+      const due = await c.query<{ provider: string }>(
+        `SELECT substr(a.key,10) AS provider FROM wallet_accounts a
+         WHERE a.kind='external' AND a.key<>'external:company'
+           AND NOT EXISTS (SELECT 1 FROM reconciliation_runs r WHERE r.provider=substr(a.key,10)
+             AND r.created_by='system' AND r.created_at>now()-make_interval(hours=>$1))
+         ORDER BY a.key`,
+        [minHoursBetween],
+      );
+      const runs = [];
+      for (const { provider } of due.rows)
+        runs.push(
+          (
+            await reconcile(c, SYSTEM_ACTOR, {
+              provider,
+              periodEnd: new Date().toISOString(),
+              reportedHeldMinor: null,
+            })
+          ).reconciliation,
+        );
+      return { runs };
+    });
   }
 }

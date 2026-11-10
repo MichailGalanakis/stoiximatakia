@@ -7,6 +7,7 @@ import {
 } from '../registration/registration-settings';
 import type { GameId } from '../tables/game-catalog';
 import { audit, type AdminActor } from '../wallet/admin';
+import { requireJurisdiction } from '../wallet/jurisdiction';
 import { WalletError } from '../wallet/wallet-error';
 import { postWallet, userAccount } from '../wallet/wallet-ledger';
 
@@ -296,6 +297,7 @@ export class TournamentStore implements OnModuleDestroy {
             !(actor.email_verified || actor.phone_verified)
           )
             throw new WalletError('account_not_eligible', 403);
+          await requireJurisdiction(c, actor.id);
           const t = await this.lockTournament(c, id);
           if (t.status !== 'open' || t.starts_at.getTime() <= Date.now())
             throw new WalletError('tournament_unavailable', 409);
@@ -335,6 +337,22 @@ export class TournamentStore implements OnModuleDestroy {
               t.entry_fee_minor,
               t.contribution_minor,
               tx,
+            ],
+          );
+          // Confirmation is queued atomically and delivered after commit.
+          await c.query(
+            "INSERT INTO notification_outbox(id,user_id,kind,payload) VALUES($1,$2,'tournament_ticket',$3)",
+            [
+              randomUUID(),
+              actor.id,
+              JSON.stringify({
+                ticketId,
+                tournamentId: id,
+                name: t.name,
+                startsAt: t.starts_at.toISOString(),
+                feeMinor: t.entry_fee_minor,
+                contributionMinor: t.contribution_minor,
+              }),
             ],
           );
           return {

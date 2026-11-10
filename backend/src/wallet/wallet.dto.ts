@@ -1,6 +1,11 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
   IsIn,
+  ValidateNested,
   IsInt,
   IsISO8601,
   IsOptional,
@@ -16,6 +21,45 @@ import {
 export class AmountOperationDto {
   @IsUUID() operationId!: string;
   @IsInt() @Min(1) @Max(100_000_000) amountMinor!: number;
+}
+export class DepositDto extends AmountOperationDto {
+  @IsOptional() @Matches(/^[a-z0-9_]{2,40}$/) method?: string;
+}
+const COUNTRY = /^[A-Z]{2}$/;
+export class CountryDto {
+  @Matches(COUNTRY) country!: string;
+}
+export class JurisdictionDto {
+  @IsBoolean() approved!: boolean;
+  @IsString() @Length(0, 500) note!: string;
+}
+export class UserIdDto {
+  @IsUUID() userId!: string;
+}
+export class PaymentMethodDto {
+  @Matches(/^[a-z0-9_]{2,40}$/) method!: string;
+  @Matches(/^[a-z0-9_]{2,40}$/) provider!: string;
+  @Matches(COUNTRY) country!: string;
+  @IsIn(['deposit', 'withdrawal']) direction!: 'deposit' | 'withdrawal';
+  @IsBoolean() active!: boolean;
+}
+export class BankReceiptDto {
+  @IsString() @Length(1, 100) bankReference!: string;
+  @Matches(/^RF[0-9]{2}[A-Z0-9]{1,21}$/) rfCode!: string;
+  @IsInt() @Min(1) @Max(100_000_000) amountMinor!: number;
+  @IsISO8601({ strict: true }) paidAt!: string;
+}
+export class BankReceiptsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => BankReceiptDto)
+  lines!: BankReceiptDto[];
+}
+export class ConfirmPayoutDto {
+  @IsIn(['paid', 'failed']) outcome!: 'paid' | 'failed';
+  @IsString() @Length(1, 100) bankReference!: string;
 }
 export class WalletOperationDto {
   @IsUUID() operationId!: string;

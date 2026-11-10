@@ -13,6 +13,13 @@ export interface WalletSettings {
   withdrawalFloorMinor: number;
   /** Above the floor, a request may take this share of the available balance. */
   withdrawalShareBps: number;
+  /** Enables RF bank-transfer deposits into this account. */
+  rfIban?: string | undefined;
+  rfBeneficiary?: string | undefined;
+  /** Unattended reconciliation interval; 0 or unset disables it. */
+  reconcileIntervalHours?: number | undefined;
+  /** Notification delivery interval; 0 or unset disables it. */
+  notifyIntervalSeconds?: number | undefined;
 }
 
 /** Owner rule: up to €100 in full, otherwise 80% of the available balance. */
@@ -67,6 +74,21 @@ export function walletSettings(
       10_000,
     ),
   };
+  const iban = env.WALLET_RF_IBAN?.replace(/\s/g, '').toUpperCase();
+  if (iban) {
+    if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(iban))
+      throw new Error('WALLET_RF_IBAN must be an IBAN');
+    settings.rfIban = iban;
+    settings.rfBeneficiary = env.WALLET_RF_BENEFICIARY || 'SkillBetting';
+  }
+  settings.reconcileIntervalHours =
+    env.WALLET_RECONCILE_INTERVAL_HOURS === '0'
+      ? 0
+      : amount(env, 'WALLET_RECONCILE_INTERVAL_HOURS', 24, 168);
+  settings.notifyIntervalSeconds =
+    env.WALLET_NOTIFY_INTERVAL_SECONDS === '0'
+      ? 0
+      : amount(env, 'WALLET_NOTIFY_INTERVAL_SECONDS', 60, 3600);
   if (settings.minDepositMinor > settings.maxDepositMinor)
     throw new Error(
       'WALLET_MIN_DEPOSIT_MINOR exceeds WALLET_MAX_DEPOSIT_MINOR',

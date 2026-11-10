@@ -28,11 +28,19 @@ export class InvalidProviderEvent extends Error {}
  */
 export interface PaymentProvider {
   readonly id: string;
+  /** Payouts confirmed by finance from the bank statement, not by webhook. */
+  readonly manualPayouts?: boolean;
   createDeposit(input: {
     depositId: string;
     amountMinor: number;
     currency: 'EUR';
-  }): Promise<{ providerReference: string; redirectUrl: string }>;
+  }): Promise<{
+    providerReference: string;
+    /** Hosted payment page, for card-style methods. */
+    redirectUrl?: string;
+    /** Payment instructions, for bank transfers. */
+    instructions?: Record<string, string>;
+  }>;
   createPayout(input: {
     withdrawalId: string;
     amountMinor: number;
@@ -54,6 +62,59 @@ const EVENT_TYPES = new Set<string>([
 ]);
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+const rfNumeric = (value: string) =>
+  value.replace(/[A-Z]/g, (ch) => String(ch.charCodeAt(0) - 55));
+const mod97 = (digits: string) =>
+  [...digits].reduce((mod, d) => (mod * 10 + Number(d)) % 97, 0);
+
+/** ISO 11649 structured creditor reference ("RF" + check digits + reference). */
+export function rfCode(reference: string): string {
+  const ref = reference.toUpperCase();
+  if (!/^[A-Z0-9]{1,21}$/.test(ref)) throw new Error('Invalid RF reference');
+  const check = String(98 - mod97(rfNumeric(`${ref}RF00`))).padStart(2, '0');
+  return `RF${check}${ref}`;
+}
+export function validRfCode(code: string): boolean {
+  return (
+    /^RF[0-9]{2}[A-Z0-9]{1,21}$/.test(code) &&
+    mod97(rfNumeric(code.slice(4) + code.slice(0, 4))) === 1
+  );
+}
+
+/**
+ * Bank transfer collections through the interbank RF system (e.g. DIAS). Each
+ * deposit gets its own RF code; money is credited only when an imported bank
+ * statement line matches it. Payouts are bank transfers confirmed by finance.
+ */
+export class BankRfProvider implements PaymentProvider {
+  readonly id = 'bank_rf';
+  readonly manualPayouts = true;
+  constructor(
+    private readonly iban: string,
+    private readonly beneficiary: string,
+  ) {}
+
+  createDeposit(input: { depositId: string }) {
+    const rf = rfCode(input.depositId.replaceAll('-', '').slice(0, 21));
+    return Promise.resolve({
+      providerReference: rf,
+      instructions: {
+        rfCode: rf,
+        iban: this.iban,
+        beneficiary: this.beneficiary,
+      },
+    });
+  }
+  createPayout(input: { withdrawalId: string }) {
+    return Promise.resolve({
+      providerReference: `bank_pay_${input.withdrawalId}`,
+    });
+  }
+  parseWebhook(): ProviderEvent {
+    throw new InvalidProviderEvent('bank_rf has no webhooks');
+  }
+}
 
 export function signSandboxEvent(
   secret: string,

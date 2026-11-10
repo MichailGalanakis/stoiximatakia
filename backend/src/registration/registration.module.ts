@@ -16,7 +16,7 @@ import {
 
 @Module({
   controllers: [RegistrationController],
-  exports: [RegistrationService, REGISTRATION_SETTINGS],
+  exports: [RegistrationService, REGISTRATION_SETTINGS, VERIFICATION_CONFIG],
   providers: [
     RegistrationService,
     RegistrationStore,

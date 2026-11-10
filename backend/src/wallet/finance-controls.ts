@@ -387,7 +387,12 @@ export async function listDisputes(c: PoolClient, status?: string) {
 export async function reconcile(
   c: PoolClient,
   actor: AdminActor,
-  input: { provider: string; periodEnd: string; reportedHeldMinor: number },
+  input: {
+    provider: string;
+    periodEnd: string;
+    /** Null when no provider statement is available (unattended runs). */
+    reportedHeldMinor: number | null;
+  },
 ) {
   const account = await c.query<{ amount: number }>(
     'SELECT balance_minor::float8 AS amount FROM wallet_accounts WHERE key=$1',
@@ -425,9 +430,13 @@ export async function reconcile(
     terminalPoolsEmpty: f.openTerminalPools === 0,
     settledHouseMatchesEmpty: f.unsettledHouseMatches === 0,
   };
-  const difference = input.reportedHeldMinor - internalHeld;
+  const difference =
+    input.reportedHeldMinor === null
+      ? null
+      : input.reportedHeldMinor - internalHeld;
   const status =
-    difference === 0 && Object.values(checks).every(Boolean)
+    (difference === null || difference === 0) &&
+    Object.values(checks).every(Boolean)
       ? 'ok'
       : 'mismatch';
   const id = randomUUID();
