@@ -351,6 +351,9 @@ void describe('euro wallet against PostgreSQL', () => {
       pendingWithdrawalMinor: 2000,
       totalMinor: 5000,
       withdrawableMinor: 3000,
+      inTournamentsMinor: 0,
+      inHouseMatchesMinor: 0,
+      monthWinningsMinor: 0,
     });
     const cancelled = await post(p, `withdrawals/${w1.withdrawal.id}/cancel`, {
       operationId: randomUUID(),
@@ -424,6 +427,9 @@ void describe('euro wallet against PostgreSQL', () => {
       pendingWithdrawalMinor: 0,
       totalMinor: 2000,
       withdrawableMinor: 2000,
+      inTournamentsMinor: 0,
+      inHouseMatchesMinor: 0,
+      monthWinningsMinor: 0,
     });
     const list = (await get(p, 'withdrawals')).json<{
       withdrawals: { status: string }[];
@@ -499,6 +505,9 @@ void describe('euro wallet against PostgreSQL', () => {
       pendingWithdrawalMinor: 2000,
       totalMinor: 3000,
       withdrawableMinor: 1000,
+      inTournamentsMinor: 0,
+      inHouseMatchesMinor: 0,
+      monthWinningsMinor: 0,
     });
   });
 
